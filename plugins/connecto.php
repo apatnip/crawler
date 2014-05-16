@@ -18,9 +18,26 @@ class Connecto
     {
         add_action('admin_menu', array($this, 'addMenuLink'));
         add_action('admin_init',array($this,'settings_res'));
+        add_action( 'wp_ajax_nopriv_myajax-submit', array($this,'myajax_submit') );
+        add_action( 'wp_ajax_myajax-submit', array($this,'myajax_submit') );
+        add_action('wp_footer', array($this,'insert_my_footer'));    
     }
 
+    function myajax_submit() {
+        if(($key =$_POST['api'])!="remove")
+        add_option( 'APkey', $key);
+        else
+        delete_option('APkey');
+        echo "Done";
+        exit;
+    }
 
+    function insert_my_footer(){
+        if($x = get_option('APkey'))
+        echo "<script type='text/javascript'>
+    alert('Embeded script');
+</script>";
+    }
     function settings_res(){
         wp_register_style('settings_style',plugins_url('media/css/settings.css',__FILE__),false,'1.0.0');
         wp_register_script('settings_script', plugins_url('media/js/settings.js', __FILE__), array('jquery'), '1.0.0' );

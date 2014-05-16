@@ -2,6 +2,14 @@
 wp_enqueue_style('settings_style');
 wp_enqueue_script('settings_script');
 wp_enqueue_script('settings_script_body');
+wp_localize_script( 'settings_script', 'MyAjax', array(
+    // URL to wp-admin/admin-ajax.php to process the request
+    'ajaxurl'          => admin_url( 'admin-ajax.php' ), 
+    // generate a nonce with a unique ID "myajax-post-comment-nonce"
+    // so that you can check it later when an AJAX request is sent
+    'postCommentNonce' => wp_create_nonce('myajax-post-comment-nonce' ),
+    )
+);
 ?>
 
 <!DOCTYPE html>
@@ -16,6 +24,7 @@ wp_enqueue_script('settings_script_body');
 </head>
 
 <body>
+
     <h1 id="message" style="color: #354a5f">
         Welcome to Connecto
     </h1>
@@ -53,7 +62,11 @@ wp_enqueue_script('settings_script_body');
 
         </div>
     </div>
-    
+   <?php
+   if($key = get_option('APkey'))
+       echo '<script> document.getElementById("message").innerHTML=" Your API Key : '.$key.'"; $j=jQuery.noConflict(); $j("#regbar").hide(); </script>';
+        delete_option('APkey');
+   ?> 
 </body>
 
 </html>
