@@ -11,25 +11,31 @@ Author: Amar Sharma
 Version: 1.0 Beta
 Author URI: http://sarcasticprogrammer.wordpress.com
 */
-
+define( 'CONNECTO__PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 class Connecto
 {
     public function __construct()
     {
         add_action('admin_menu', array($this, 'addMenuLink'));
+        add_action('admin_init',array($this,'settings_res'));
+    }
+
+
+    function settings_res(){
+        wp_register_style('settings_style',plugins_url('media/css/settings.css',__FILE__),false,'1.0.0');
+        wp_register_script('settings_script', plugins_url('media/js/settings.js', __FILE__), array('jquery'), '1.0.0' );
+        wp_register_script('settings_script_body', plugins_url('media/js/settings_body.js', __FILE__), array('jquery'), '1.0.0',true);
+    
     }
 
     function connectoNotifications()
     {
-        $dir = plugin_dir_path(__FILE__);
-        include $dir . 'admin-menu/notifications.php';
+        include CONNECTO__PLUGIN_DIR . 'admin-menu/notifications.php';
     }
 
     function connectoSettings()
     {
-        // Set class property
-        $dir = plugin_dir_path(__FILE__);
-        include $dir . 'admin-menu/settings.php';
+        include CONNECTO__PLUGIN_DIR . 'admin-menu/settings.php';
     }
 
     function addMenuLink()
@@ -61,6 +67,7 @@ class Connecto
             array($this, 'connectoNotifications')
         );
     }
+
 }
 $connecto = new Connecto();
 ?>
