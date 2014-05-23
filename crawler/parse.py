@@ -18,6 +18,9 @@ class parseTitle(HTMLParser.HTMLParser):
 
 aparser = parseTitle()
 '''
+
+
+
 var=input('no of results?')
 j = urllib2.urlopen('http://wwwranking.webdatacommons.org/Q/?pageIndex=0&pageSize='+str(var))
 js = json.load(j)
@@ -35,7 +38,7 @@ for rs in ourResult:
 	dom = parse( urllib2.urlopen( aurl))
 	ranktag = dom.getElementsByTagName('REACH')
 	print ranktag[0].attributes['RANK'].value
-
+print 'done'
 '''
 	url = http://path.to.url/
     dom = minidom.parse(urlopen(url))
