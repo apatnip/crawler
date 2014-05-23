@@ -1,0 +1,62 @@
+body
+{
+    font-family:Arial, Helvetica, sans-serif;
+    font-size:12px; background-color:#333;
+}
+#container
+{
+    width:350px
+}
+#tabbox
+{
+    height:40px
+}
+#panel
+{
+    background-color:#FFF;
+    height:300px;
+
+}
+.tab
+{
+    background: #dedede;
+    display: block;
+    height: 40px;
+    line-height: 40px;
+    text-align: center;
+    width: 80px;
+    float: right;
+    font-weight: bold;
+    -webkit-border-top-left-radius: 4px;
+    -webkit-border-top-right-radius: 4px;
+    -moz-border-radius: 4px 4px 0px 0px;
+}
+a
+{
+    color: #000;
+    margin: 0;
+    padding: 0;
+    text-decoration: none;
+}
+.signup
+{
+    margin-left:8px;
+
+}
+.select
+{
+    background-color:#FFF;
+
+}
+#loginbox
+{
+    height:300px;
+    padding:10px;
+}
+#signupbox
+{
+    height:300px;
+    padding:10px;
+    display:none;
+}
+

@@ -1,5 +1,3 @@
-
-//unable to connect to mongoose
 /*
 var mongoose = require('mongoose');
 var urls;
