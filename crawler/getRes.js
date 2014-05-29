@@ -32,20 +32,19 @@ url = args[1];
 
 page.open(url);//
 
-
 var page = webPage.create();
 page.open(url);//
-
-//function next(status) {
-//	console.log('Status: ' + status);
-//	i++;
-//	console.log('---'+i);
-//	//if(i<4) page.open(url, next(status));
-//	phantom.exit();
-//  	// Do other things here...	
-//}
-//page.render('./sshot.png');
-//mongoose part not working
+	
+function next(status) {
+	console.log('Status: ' + status);
+	i++;
+	console.log('---'+i);
+	//if(i<4) page.open(url, next(status));
+	phantom.exit();
+  	// Do other things here...	
+}
+page.render('./sshot.png');
+mongoose part not working
 /*
 var mongoose = require('mongoose');
 var urls;
