@@ -6,12 +6,13 @@ var cheerio = require('cheerio');
 
 //GET parameters
 var pageSize=0;				// Get data from wwwranking in slots of?
-var pageNo=0;					// No of slots
+var pageNo=0;				// No of slots
 var colName = 'tpages';		// Collection name
-var qfindurls = false;			// Whether add urls
+var qfindurls = false;		// Whether add urls
 var qalexa = false;			// Whether get alexa data
 var addwCheck = true;		// Add to db with check if already exists
 var qprint = false;			// whether print database
+var qsc = true;				// whether take screenshot
 db = require('./model/db'),
 Data = mongoose.model('tpages');
 
@@ -32,11 +33,23 @@ con.once('open', function callback () {
 
 /***************************************************/
 
-	var noofpages = 5;
+	var noofpages = 200;
+	var slots = 2;
 	Data.find(	function(err, arr) {
-		arr.forEach(function(e,i,a) {
-			if(i<noofpages)	findRes(e);
-		});
+		var add = 0;
+		timera = setInterval(function() {
+			for(i=add; i<slots+add; i++) {
+				console.log('i = ' + i + 'total = ' + noofpages);
+				if(i==noofpages) {
+					console.log('timer stopped');
+					clearInterval(timera);
+					break;
+				}
+				console.log('At i = ' + i);
+				findRes(arr[i]);
+			}
+			add+=slots;
+		}, 20000);
 	});
 });
 
@@ -68,10 +81,12 @@ var gethost = function (href) {
 	urlo = url.parse(href);
 	return urlo.host;
 }
-
+var x = 'requested';
+donecount = 0;
 function findRes(e) {
 	var pageurl = e.url;
-	console.log(pageurl);
+	//console.log(pageurl);
+//	pageurl = 'http://www.stumbleupon.com/';
 	phantom.create(function (ph) {
 	  ph.createPage(function (page) {
 	    page.set('viewportSize', { width: 1366, height: 768});
@@ -79,16 +94,29 @@ function findRes(e) {
 		var cssarr = [];
 		var extjsarr = [];
 		var host = gethost(pageurl);
-		page.set ('settings.userAgent', 'Mozilla/5.0 (Windows NT 5.1; rv:31.0) Gecko/20100101 Firefox/31.0');
+		page.set('onError',  function(msg, trace) {
+			console.log('Found error: '+msg);
+		    var msgStack = ['ERROR: ' + msg];
+		    if (trace && trace.length) {
+		        msgStack.push('TRACE:');
+		        trace.forEach(function(t) {
+		            msgStack.push(' -> ' + t.file + ': ' + t.line + (t.function ? ' (in function "' + t.function + '")' : ''));
+		        });
+		    }
+		    // uncomment to log into the console 
+		     console.error(msgStack.join('\n'));
+		});
+		page.set ('settings.userAgent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1944.0 Safari/537.36');
+		page.set ('settings.resourceTimeout', 15000);
 		page.set('onResourceReceived', function(response) {
 			if(response.stage == 'end') {
 				var url = response.url;
+		//		console.log(url);
+				hosturl = gethost(url);
 				type = response.contentType;
-
-		//		console.log(url+'  '+host);
 				if(testjs(url, type)) {// resource is js
 					jsarr.push(url);
-					if(testextjs ( url, host)) {
+					if(testextjs ( hosturl, host)) {
 						extjsarr.push(url);
 					}
 				}
@@ -98,13 +126,19 @@ function findRes(e) {
 				// other
 			}
 		})
+		page.set('onNavigationRequested', function(url, type, willNavigate, main) {
+		  	if(main) console.log('Trying to navigate to: ' + url);
+		//  console.log('Caused by: ' + type);
+		// 	console.log('Will actually navigate: ' + willNavigate);
+		});
 	    page.open(pageurl, function (status) {
 	    	if(status == 'success') {
 
 	    	}
 			page.evaluate(function () { return document.title; }, function (result) {
 			//now actually done
-			console.log('\nPage title is ' + result);
+			console.info('\nurl:\t' + pageurl);
+			console.log('Page title:\t' + result);
 /*
 				//CSS
 			console.log ('\nCSS:\n');
@@ -118,8 +152,9 @@ function findRes(e) {
 			  console.log((index+1)+ ': '+value);
 			});
 */
+
 			//External JS
-			console.log('\nExternal Javascripts:\n');
+			console.log('\n\tExternal Javascripts:\n');
 			extjsarr.forEach(function(value, index) {
 			  console.log((index+1)+ ': '+value);
 			});
@@ -132,6 +167,8 @@ function findRes(e) {
 			e.save(function(err) {
 	            if (err) return console.error(err);
 	            console.log('saved to db');
+	            donecount++;
+	            console.log('Done '+ donecount);
             });
 
 			ph.exit();
@@ -189,17 +226,17 @@ function findData () {
 // Utility function that downloads a URL and invokes
 // callback with the data.
 function download(url, callback) {
-  http.get(url, function(res) {
-    var data = "";
-    res.on('data', function (chunk) {
-      data += chunk;
-    });
-    res.on("end", function() {
-      callback(data);
-    });
-  }).on("error", function() {
-    callback(null);
-  });
+	http.get(url, function(res) {
+	var data = "";
+	res.on('data', function (chunk) {
+		data += chunk;
+	});
+	res.on("end", function() {
+		callback(data);
+	});
+	}).on("error", function() {
+		callback(null);
+	});
 }
 
 //print existing data
