@@ -5,10 +5,11 @@ var mongoose = require( 'mongoose' );
 var dataSchema = new mongoose.Schema({
 	url: String,
 	arank: Number,
-	psize: Number,
+	ltime: Number,
 	ptime: Number,
     js: [String],
 	capture: String,
-	ssMobile: String
+	mcapture: String,
+	title: String
 });
 var Data = module.exports = mongoose.model(colName, dataSchema);

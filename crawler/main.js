@@ -13,9 +13,12 @@ var qalexa = false;			// Whether get alexa data
 var addwCheck = true;		// Add to db with check if already exists
 var qprint = false;			// whether print database
 var qsc = true;				// whether take screenshot
+var savetodb = false;
 db = require('./model/db'),
 Data = mongoose.model('tpages');
 
+var live=false;
+//var liveurl = 'http://www.connecto.io/';
 //Connect to db
 var mongoose = require('mongoose');
 db = require('./model/db'),
@@ -30,13 +33,21 @@ con.once('open', function callback () {
 	if(qprint) printData(Data);
 	if(qfindurls) findUrl();
 	if(qalexa) findRank();
-
+	/*
+	if(live) {
+		e = new Data ({url: liveurl});
+		findRes(e);
+		addData(e);
+	}
+	*/
 /***************************************************/
-
-	var noofpages = 200;
-	var slots = 2;
-	Data.find(	function(err, arr) {
+	
+	/*
+	var noofpages = 1;
+	var slots = 1;
+	Data.find({js:[]}, function(err, arr) {
 		var add = 0;
+		noofpages = arr.length;
 		timera = setInterval(function() {
 			for(i=add; i<slots+add; i++) {
 				console.log('i = ' + i + 'total = ' + noofpages);
@@ -51,14 +62,35 @@ con.once('open', function callback () {
 			add+=slots;
 		}, 20000);
 	});
+	*/
 });
+var done=false;
+exports.out = function (req, res) {
+	console.log('got request\n');
+	liveurl = req;
+	e = new Data ({url: liveurl});
+	findRes(e);
+	addData(e);
+    res.write('Processing...\n');
+    setInterval (function() {
+    	if(done) {
+    		done=false;
+		    res.write(JSON.stringify(e));
+		    res.end('Yayy!!');
+    	}
+    }, 200)
+};
+function change(e) {
+	e.arank=10;
+	return e;
+}
 
 var phantom = require('phantom');
+
 String.prototype.endsWith = function(suffix) {
     return this.indexOf(suffix, this.length - suffix.length) !== -1;
 };
 String.prototype.contains = function(it) { return this.indexOf(it) != -1; };
-
 function testjs (url, type) {
 	if(url.endsWith('.js')) return true;
 	else if(url.contains('.js?')) return true;
@@ -76,17 +108,16 @@ function testextjs (url, host) {
 	else return true;
 }
 url = require('url')
-
 var gethost = function (href) {
 	urlo = url.parse(href);
 	return urlo.host;
 }
-var x = 'requested';
+
 donecount = 0;
 function findRes(e) {
 	var pageurl = e.url;
-	//console.log(pageurl);
-//	pageurl = 'http://www.stumbleupon.com/';
+//	console.log(pageurl);
+//	pageurl = 'http://metacafe.com';
 	phantom.create(function (ph) {
 	  ph.createPage(function (page) {
 	    page.set('viewportSize', { width: 1366, height: 768});
@@ -95,7 +126,7 @@ function findRes(e) {
 		var extjsarr = [];
 		var host = gethost(pageurl);
 		page.set('onError',  function(msg, trace) {
-			console.log('Found error: '+msg);
+			//console.log('Found error: '+msg);
 		    var msgStack = ['ERROR: ' + msg];
 		    if (trace && trace.length) {
 		        msgStack.push('TRACE:');
@@ -132,45 +163,51 @@ function findRes(e) {
 		// 	console.log('Will actually navigate: ' + willNavigate);
 		});
 	    page.open(pageurl, function (status) {
-	    	if(status == 'success') {
-
-	    	}
+		    if (status !== 'success') {
+		        console.log('Unable to load' + pageurl);
+		    }
 			page.evaluate(function () { return document.title; }, function (result) {
 			//now actually done
-			console.info('\nurl:\t' + pageurl);
-			console.log('Page title:\t' + result);
-/*
-				//CSS
-			console.log ('\nCSS:\n');
-			cssarr.forEach(function(value, index) {
-			  console.log((index+1)+ ': '+value);
-			});
 
-			//JS
-			console.log('\nJavascripts:\n');
-			jsarr.forEach(function(value, index) {
-			  console.log((index+1)+ ': '+value);
-			});
-*/
-
-			//External JS
-			console.log('\n\tExternal Javascripts:\n');
-			extjsarr.forEach(function(value, index) {
-			  console.log((index+1)+ ': '+value);
-			});
 			var path = 'img/' + host +'.png';
 			page.render('./'+path);
 			console.log('page rendered at ' + path);
-
 			e.js = extjsarr;
 			e.capture = path;
-			e.save(function(err) {
-	            if (err) return console.error(err);
-	            console.log('saved to db');
-	            donecount++;
-	            console.log('Done '+ donecount);
-            });
+			if(!live) {
+				console.info('\nurl:\t' + pageurl);
+				console.log('Page title:\t' + result);
+	/*
+					//CSS
+				console.log ('\nCSS:\n');
+				cssarr.forEach(function(value, index) {
+				  console.log((index+1)+ ': '+value);
+				});
 
+				//JS
+				console.log('\nJavascripts:\n');
+				jsarr.forEach(function(value, index) {
+				  console.log((index+1)+ ': '+value);
+				});
+	*/
+
+				//External JS
+				console.log('\n\tExternal Javascripts:\n');
+				extjsarr.forEach(function(value, index) {
+				  console.log((index+1)+ ': '+value);
+				});
+				e.save(function(err) {
+		            if (err) return console.error(err);
+		            console.log('saved to db');
+		            donecount++;
+		            console.log('Done '+ donecount);
+	            });	
+			}
+			else {
+				e.title= result;
+				console.log(e);
+				done=true;
+			}
 			ph.exit();
 			});
 		});
@@ -213,7 +250,7 @@ function findUrl() {
 //find ranks of all the urls present in the db
 //also calls addRank
 function findData () {
-    urls.find(function(err, all) {
+    Data.find(function(err, all) {
         all.forEach(function(element,index,array) {
             if(element.arank==null) {
                 console.log('searching rank for ' + element.url);
@@ -250,7 +287,7 @@ function printData (urls) {
 //refactor urls
 function addUrls(url) {
 	if(addwCheck) {			//do without check in db
-		var page = new urls({ url: url})
+		var page = new Data({ url: url})
 		page.save(function(err) {
 			if (err) return console.error(err);
 			//saved
@@ -258,14 +295,14 @@ function addUrls(url) {
 		})
 	}
 	else {					//do with check if already present
-		urls.find({url: url}, function(err, arr) {
+		Data.find({url: url}, function(err, arr) {
 			console.log('searching ' + url);
 			//console.log(arr);
 			if(err) {
 				
 			} 
 			if(arr.length==0) {
-				var page = new urls({ url: url ,arank:''})
+				var page = new Data({ url: url ,arank:''})
 				page.save(function(err) {
 					if (err) return console.error(err);
 	  				//console.log('saved');
@@ -297,20 +334,22 @@ function addData(e) {
     			xmlMode:true
     		});
             rank = $('REACH').attr('RANK');
-            e.time = $('SPEED').attr('TEXT');
+            e.ltime = $('SPEED').attr('TEXT');
     		e.ptime = $('SPEED').attr('PCT');
 
     		if(rank) {
-                console.log(rank);
+                //console.log(rank);
                 e.arank = rank;
             }
     		else if(typeof rank === 'undefined') {
     			console.log ('Rank for '+aurl+ ' not available.');
     		}
-            e.save(function(err) {
-            if (err) return console.error(err);
-                //console.log('saved');
-            })    		
+    		if(!live) {
+	    		e.save(function(err) {
+	            	if (err) return console.error(err);
+	                //console.log('saved');
+	            })	
+    		}
     	}
     	else console.log('Error fetching alexa data for '+ aurl);
     });
