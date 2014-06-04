@@ -1,8 +1,8 @@
-*Copy phantom.js from crawler to crawler/node_modules/phantom/.
-*Screenshot are automatically saved to crawler/img named <domain>/png for all the queried pages.
+* Copy phantom.js from crawler to crawler/node_modules/phantom/.
+* Screenshot are automatically saved to crawler/img named <domain>/png for all the queried pages.
 
 
-*Support automated as well as live version.
+* Support automated as well as live version.
 
 # README #
 
