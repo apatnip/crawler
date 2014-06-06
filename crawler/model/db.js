@@ -1,10 +1,12 @@
 // Bring Mongoose into the app
 var mongoose = require('mongoose');
 
+// GET parameter
 // Build the connection string
 // Mongoose Connect Parameter
 //var dbURI = 'mongodb://localhost/test';
-var dbURI = 'mongodb://192.168.100.102/crawler';
+//var dbURI = 'mongodb://192.168.100.211/crawler';
+var dbURI = 'mongodb://deshaw.local/crawler';
 //'mongodb://username:password@host:port/database?options...'
 
 // Create the database connection

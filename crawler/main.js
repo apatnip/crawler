@@ -3,6 +3,16 @@ var http = require("http");
 var request = require('request');
 var mongoose = require('mongoose');
 var cheerio = require('cheerio');
+var colors = require('colors');
+var phantom = require('phantom');
+var events = require('events');
+var mongoose = require('mongoose');
+var fs = require('fs');
+
+var https = require('https'),
+    key = 'AIzaSyCRlhvnFqzGWcKOWRH64Wi8Bu2NMja0csE',
+    url = 'http://www.connecto.io'
+
 
 //GET parameters
 var pageSize=0;				// Get data from wwwranking in slots of?
@@ -12,15 +22,56 @@ var qfindurls = false;		// Whether add urls
 var qalexa = false;			// Whether get alexa data
 var addwCheck = true;		// Add to db with check if already exists
 var qprint = false;			// whether print database
-var qsc = true;				// whether take screenshot
-var savetodb = false;
+var resTimeout = 60000;		// Resource timeout
 db = require('./model/db'),
 Data = mongoose.model('tpages');
 
-var live=false;
-//var liveurl = 'http://www.connecto.io/';
+var loadImage = true;
+var live=true;
+
+var emitter = new events.EventEmitter();
+
+var API_KEY = 'AIzaSyCRlhvnFqzGWcKOWRH64Wi8Bu2NMja0csE';
+
+// Specify the URL you want PageSpeed results for here:
+var URL_TO_GET_RESULTS_FOR = 'http://code.google.com/speed/page-speed/';
+
+//for serverLive.js
+exports.out = function (url, res) {
+	console.log('got request for -> '+url);
+	e = new Data ({url: url});
+	var crash = phantom.crash(url);
+	crash.on('error', function() {
+    	e.crash = true;
+		console.log('Crashed: '.red+crash.url);
+		res.end(url+ ' sucks :-P '+ 'It crashed!!\n');
+	});
+	findRes(e);
+	addData(e);
+	addgpsi(e, 'desktop');
+	addgpsi(e, 'mobile');
+
+    //res.writeHead(200, {'content-type':'text/html'});
+    res.write('Processing...\n');
+    emitter.on('done', function() {
+    	res.write('Here\'s the result:\n');
+	    res.write(JSON.stringify(e, null, 4)+'\n');
+	    /*
+	    path = './'+e.capture;
+	    console.log(path);
+	    fs.readFile(path, function(error, file) {
+
+		    if(error) console.log('Error reading file');
+		    var imagedata = new Buffer(file).toString('base64');
+		    res.write("hi there!<img src='data:my_pic.jpg;base64,"+imagedata+"'/>");
+		    res.end('Yayy!!\n');
+	    });
+    	*/
+    	res.end('Yayy!!\n');
+	});
+};
+
 //Connect to db
-var mongoose = require('mongoose');
 db = require('./model/db'),
 Data = mongoose.model('tpages');
 
@@ -32,60 +83,34 @@ con.once('open', function callback () {
 
 	if(qprint) printData(Data);
 	if(qfindurls) findUrl();
-	if(qalexa) findRank();
-	/*
-	if(live) {
-		e = new Data ({url: liveurl});
-		findRes(e);
-		addData(e);
-	}
-	*/
+	if(qalexa) findData();
+
 /***************************************************/
 	
-	/*
-	var noofpages = 1;
-	var slots = 1;
-	Data.find({js:[]}, function(err, arr) {
-		var add = 0;
-		noofpages = arr.length;
-		timera = setInterval(function() {
-			for(i=add; i<slots+add; i++) {
-				console.log('i = ' + i + 'total = ' + noofpages);
-				if(i==noofpages) {
-					console.log('timer stopped');
-					clearInterval(timera);
-					break;
+	if(!live) {
+		var query = {};
+		var noofpages = 50;
+		var slots = 5;
+		Data.find(query, function(err, arr) {
+			var add = 0;
+			//noofpages = arr.length;
+			console.log('total = ' + noofpages);
+			timera = setInterval(function() {
+				for(i=add; i<slots+add; i++) {
+					if(i==noofpages) {
+						console.log('timer stopped');
+						clearInterval(timera);
+						break;
+					}
+					console.log('( %d ) ' + arr[i].url.bold, i+1);
+					findRes(arr[i]);
 				}
-				console.log('At i = ' + i);
-				findRes(arr[i]);
-			}
-			add+=slots;
-		}, 20000);
-	});
-	*/
+				add+=slots;
+			}, 10000);
+		});		
+	}
+	
 });
-var done=false;
-exports.out = function (req, res) {
-	console.log('got request\n');
-	liveurl = req;
-	e = new Data ({url: liveurl});
-	findRes(e);
-	addData(e);
-    res.write('Processing...\n');
-    setInterval (function() {
-    	if(done) {
-    		done=false;
-		    res.write(JSON.stringify(e));
-		    res.end('Yayy!!');
-    	}
-    }, 200)
-};
-function change(e) {
-	e.arank=10;
-	return e;
-}
-
-var phantom = require('phantom');
 
 String.prototype.endsWith = function(suffix) {
     return this.indexOf(suffix, this.length - suffix.length) !== -1;
@@ -94,7 +119,7 @@ String.prototype.contains = function(it) { return this.indexOf(it) != -1; };
 function testjs (url, type) {
 	if(url.endsWith('.js')) return true;
 	else if(url.contains('.js?')) return true;
-	else if(type!= null && type.contains('javasccript')) return true;
+	else if(type!= null && type.contains('javascript')) return true;
 	return false;
 }
 function testcss (url, type) {
@@ -116,9 +141,32 @@ var gethost = function (href) {
 donecount = 0;
 function findRes(e) {
 	var pageurl = e.url;
+	var crash = phantom.crash(pageurl);
+	crash.once('error', function() {
+    	e.crash = true;
+		console.error('Crashed: '.yellow +crash.url);
+		console.error(pageurl+ ' sucks :-P It crashed!!\n');
+		if(!live) {
+			e.save(function(err) {});	
+		}
+	});
+	if(loadImage == false) {
+		arg = '--load-images=no';
+	}
+	else arg = '';
 //	console.log(pageurl);
 //	pageurl = 'http://metacafe.com';
-	phantom.create(function (ph) {
+	phantom.create(arg,function (ph) {
+		ph.onError = function(msg, trace) {
+		  var msgStack = ['PHANTOM ERROR: ' + msg];
+		  if (trace && trace.length) {
+		    msgStack.push('TRACE:');
+		    trace.forEach(function(t) {
+		      msgStack.push(' -> ' + (t.file || t.sourceURL) + ': ' + t.line + (t.function ? ' (in function ' + t.function +')' : ''));
+		    });
+		  }
+		  console.error(msgStack.join('\n'));
+		};
 	  ph.createPage(function (page) {
 	    page.set('viewportSize', { width: 1366, height: 768});
 	  	var jsarr = [];
@@ -127,7 +175,7 @@ function findRes(e) {
 		var host = gethost(pageurl);
 		page.set('onError',  function(msg, trace) {
 			//console.log('Found error: '+msg);
-		    var msgStack = ['ERROR: ' + msg];
+		    var msgStack = ['ERROR: '.red + msg];
 		    if (trace && trace.length) {
 		        msgStack.push('TRACE:');
 		        trace.forEach(function(t) {
@@ -138,7 +186,8 @@ function findRes(e) {
 		     console.error(msgStack.join('\n'));
 		});
 		page.set ('settings.userAgent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1944.0 Safari/537.36');
-		page.set ('settings.resourceTimeout', 15000);
+		page.set ('settings.resourceTimeout', resTimeout);
+
 		page.set('onResourceReceived', function(response) {
 			if(response.stage == 'end') {
 				var url = response.url;
@@ -157,8 +206,12 @@ function findRes(e) {
 				// other
 			}
 		})
+		page.set('onResourceError' , function(resourceError) {
+			console.log('Unable to load resource (#' + resourceError.id + 'URL:' + resourceError.url + ')');
+			console.log('Error code: ' + resourceError.errorCode + '. Description: ' + resourceError.errorString);
+		});
 		page.set('onNavigationRequested', function(url, type, willNavigate, main) {
-		  	if(main) console.log('Trying to navigate to: ' + url);
+		//  	if(main) console.log('Trying to navigate to: ' + url);
 		//  console.log('Caused by: ' + type);
 		// 	console.log('Will actually navigate: ' + willNavigate);
 		});
@@ -166,48 +219,40 @@ function findRes(e) {
 		    if (status !== 'success') {
 		        console.log('Unable to load' + pageurl);
 		    }
-			page.evaluate(function () { return document.title; }, function (result) {
+			page.evaluate(function () { 
+				var style = document.createElement('style'),
+		  		text = document.createTextNode('body { background: #fff }');
+				style.setAttribute('type', 'text/css');
+				style.appendChild(text);
+				document.head.insertBefore(style, document.head.firstChild);
+				return document; }, function (document) {
 			//now actually done
-
-			var path = 'img/' + host +'.png';
-			page.render('./'+path);
-			console.log('page rendered at ' + path);
+			
+			e.title = document.title;
+			if(loadImage == true) {
+				var path = 'img/' + host;
+				page.render('./'+path, {
+					format:'jpeg',
+					quality:'60'
+				});
+				//console.log('page rendered at ' + path);
+				e.capture = path +'.jpeg';				
+			}
 			e.js = extjsarr;
-			e.capture = path;
+
 			if(!live) {
-				console.info('\nurl:\t' + pageurl);
-				console.log('Page title:\t' + result);
-	/*
-					//CSS
-				console.log ('\nCSS:\n');
-				cssarr.forEach(function(value, index) {
-				  console.log((index+1)+ ': '+value);
-				});
-
-				//JS
-				console.log('\nJavascripts:\n');
-				jsarr.forEach(function(value, index) {
-				  console.log((index+1)+ ': '+value);
-				});
-	*/
-
-				//External JS
-				console.log('\n\tExternal Javascripts:\n');
-				extjsarr.forEach(function(value, index) {
-				  console.log((index+1)+ ': '+value);
-				});
 				e.save(function(err) {
 		            if (err) return console.error(err);
-		            console.log('saved to db');
+		            //console.log('saved to db');
 		            donecount++;
-		            console.log('Done '+ donecount);
+		            console.info('Done '.green+ donecount);
 	            });	
 			}
 			else {
-				e.title= result;
-				console.log(e);
-				done=true;
+				emitter.emit('done');
 			}
+
+			console.log(e);
 			ph.exit();
 			});
 		});
@@ -248,7 +293,7 @@ function findUrl() {
 }
 
 //find ranks of all the urls present in the db
-//also calls addRank
+//also calls addData
 function findData () {
     Data.find(function(err, all) {
         all.forEach(function(element,index,array) {
@@ -276,6 +321,39 @@ function download(url, callback) {
 	});
 }
 
+function addgpsi(e, strategy) {
+	var url = e.url;
+	getgpsi(url, strategy, function(data) {
+	  if (data) {
+	    var json = JSON.parse(data);
+	    if(strategy == 'desktop') e.psid = json;
+	    else if(strategy =='mobile') e.psim = json;
+//	    e.markModified('gpsi');
+//	    console.log(e);
+	    if(!live) e.save();
+	  }
+	  else console.log("error");
+	});
+}
+
+function getgpsi(url, strategy, callback) {
+  https.get({
+    host: 'www.googleapis.com', 
+    path: '/pagespeedonline/v1/runPagespeed?url=' + encodeURIComponent(url) + 
+          '&key='+key+'&strategy='+strategy}, function(res) {
+  var data = "";
+  res.on('data', function (chunk) {
+    data += chunk;
+  });
+  res.on("end", function() {
+    callback(data);
+  });
+  }).on("error", function(err) {
+    console.log(err);
+    callback(null);
+  });
+}
+
 //print existing data
 function printData (urls) {
 	urls.find(function(err, urls) {
@@ -286,7 +364,7 @@ function printData (urls) {
 
 //refactor urls
 function addUrls(url) {
-	if(addwCheck) {			//do without check in db
+	if(!addwCheck) {			//do without check in db
 		var page = new Data({ url: url})
 		page.save(function(err) {
 			if (err) return console.error(err);
