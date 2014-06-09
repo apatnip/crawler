@@ -1,5 +1,5 @@
 //GET parameter
-var colName = 'tpages';
+var colName = 'thoupages';
 
 var mongoose = require( 'mongoose' );
 
@@ -13,7 +13,10 @@ var dataSchema = new mongoose.Schema({
 	mcapture: String,
 	title: String,
 	crash: Boolean,
-	psid:  mongoose.Schema.Types.Mixed,
-	psim:  mongoose.Schema.Types.Mixed
+	psid: mongoose.Schema.Types.Mixed,
+	psim: mongoose.Schema.Types.Mixed,
+	timeStamp: Date,
+	html: String,
+	alexa: mongoose.Schema.Types.Mixed
 });
 var Data = module.exports = mongoose.model(colName, dataSchema);

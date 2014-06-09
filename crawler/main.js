@@ -8,36 +8,44 @@ var phantom = require('phantom');
 var events = require('events');
 var mongoose = require('mongoose');
 var fs = require('fs');
+var parseString = require('xml2js').parseString;
 
 var https = require('https'),
     key = 'AIzaSyCRlhvnFqzGWcKOWRH64Wi8Bu2NMja0csE',
     url = 'http://www.connecto.io'
 
-
 //GET parameters
-var pageSize=0;				// Get data from wwwranking in slots of?
-var pageNo=0;				// No of slots
-var colName = 'tpages';		// Collection name
 var qfindurls = false;		// Whether add urls
-var qalexa = false;			// Whether get alexa data
+
+//Modes for fetching data
+var alexaMode = true;		// Whether get alexa data
+var jsMode = true;			// get resources (js)
+var psidMode = true;		// get PageSpeed insights for desktop
+var psimMode = true;		// get PageSpeed Insights for mobile
+
+//config
+var resTimeout = 60000;		// Resource timeout
+var pageSize=1000;			// Get data from wwwranking in slots of?
+var pageNo=10;				// No of slots
+var colName = 'thoupages';		// Collection name
+
+var loadImage = true;		
+var live=false;
 var addwCheck = true;		// Add to db with check if already exists
 var qprint = false;			// whether print database
-var resTimeout = 60000;		// Resource timeout
-db = require('./model/db'),
-Data = mongoose.model('tpages');
 
-var loadImage = true;
-var live=true;
+// automated config
+var query = {};
+var noofpages = 4;
+var slots = 2;
+var executeInterval = 5000;
+
 
 var emitter = new events.EventEmitter();
 
-var API_KEY = 'AIzaSyCRlhvnFqzGWcKOWRH64Wi8Bu2NMja0csE';
-
-// Specify the URL you want PageSpeed results for here:
-var URL_TO_GET_RESULTS_FOR = 'http://code.google.com/speed/page-speed/';
-
 //for serverLive.js
 exports.out = function (url, res) {
+ 	res.writeHead(200, {"Content-Type": "application/json"});
 	console.log('got request for -> '+url);
 	e = new Data ({url: url});
 	var crash = phantom.crash(url);
@@ -50,67 +58,62 @@ exports.out = function (url, res) {
 	addData(e);
 	addgpsi(e, 'desktop');
 	addgpsi(e, 'mobile');
-
-    //res.writeHead(200, {'content-type':'text/html'});
-    res.write('Processing...\n');
     emitter.on('done', function() {
-    	res.write('Here\'s the result:\n');
-	    res.write(JSON.stringify(e, null, 4)+'\n');
+	    res.end(JSON.stringify(e, null, 2)+'\n');
 	    /*
 	    path = './'+e.capture;
 	    console.log(path);
 	    fs.readFile(path, function(error, file) {
-
 		    if(error) console.log('Error reading file');
 		    var imagedata = new Buffer(file).toString('base64');
 		    res.write("hi there!<img src='data:my_pic.jpg;base64,"+imagedata+"'/>");
-		    res.end('Yayy!!\n');
 	    });
     	*/
-    	res.end('Yayy!!\n');
 	});
 };
 
 //Connect to db
-db = require('./model/db'),
-Data = mongoose.model('tpages');
 
-var con = mongoose.connection;
-con.on('error', console.error.bind(console, 'connection error:'));
-con.once('open', function callback () {
+if(!live) {
+	db = require('./model/db'),
+	Data = mongoose.model(colName);
+	var con = mongoose.connection;
+	con.on('error', console.error.bind(console, 'connection error:'));
+	con.once('open', function callback () {
 
-/****************Most Important Calls***************/
+	/****************Most Important Calls***************/
 
-	if(qprint) printData(Data);
-	if(qfindurls) findUrl();
-	if(qalexa) findData();
+		if(qprint) printData(Data);
+		if(qfindurls) findUrl();
+		if(!live) execute();
 
-/***************************************************/
-	
-	if(!live) {
-		var query = {};
-		var noofpages = 50;
-		var slots = 5;
-		Data.find(query, function(err, arr) {
-			var add = 0;
-			//noofpages = arr.length;
-			console.log('total = ' + noofpages);
-			timera = setInterval(function() {
-				for(i=add; i<slots+add; i++) {
-					if(i==noofpages) {
-						console.log('timer stopped');
-						clearInterval(timera);
-						break;
-					}
-					console.log('( %d ) ' + arr[i].url.bold, i+1);
-					findRes(arr[i]);
+	/***************************************************/
+		
+	});
+}
+function execute() {
+	Data.find(query, function(err, arr) {
+		var add = 0;
+		if(noofpages==0) noofpages = arr.length;
+		console.log('total = ' + noofpages);
+		timera = setInterval(function() {
+			for(i=add; i<slots+add; i++) {
+				if(i==noofpages) {
+					console.log('timer stopped');
+					clearInterval(timera);
+					break;
 				}
-				add+=slots;
-			}, 10000);
-		});		
-	}
-	
-});
+				e = arr[i];
+				console.log('( %d ) ' + e.url.bold, i+1);
+				if(jsMode) findRes(e);
+				if(psidMode) addgpsi(e, 'desktop');
+				if(psimMode) addgpsi(e, 'mobile');
+				if(alexaMode) addData(e);
+			}
+			add+=slots;
+		}, executeInterval);
+	});	
+}
 
 String.prototype.endsWith = function(suffix) {
     return this.indexOf(suffix, this.length - suffix.length) !== -1;
@@ -137,6 +140,12 @@ var gethost = function (href) {
 	urlo = url.parse(href);
 	return urlo.host;
 }
+function testimg (url, type) {
+	if(url.endsWith('.jpg')) return true;
+	if(url.endsWith('.png')) return true;
+	if(url.endsWith('.gif')) return true;
+	return false;
+}
 
 donecount = 0;
 function findRes(e) {
@@ -154,8 +163,7 @@ function findRes(e) {
 		arg = '--load-images=no';
 	}
 	else arg = '';
-//	console.log(pageurl);
-//	pageurl = 'http://metacafe.com';
+
 	phantom.create(arg,function (ph) {
 		ph.onError = function(msg, trace) {
 		  var msgStack = ['PHANTOM ERROR: ' + msg];
@@ -187,7 +195,6 @@ function findRes(e) {
 		});
 		page.set ('settings.userAgent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1944.0 Safari/537.36');
 		page.set ('settings.resourceTimeout', resTimeout);
-
 		page.set('onResourceReceived', function(response) {
 			if(response.stage == 'end') {
 				var url = response.url;
@@ -211,7 +218,7 @@ function findRes(e) {
 			console.log('Error code: ' + resourceError.errorCode + '. Description: ' + resourceError.errorString);
 		});
 		page.set('onNavigationRequested', function(url, type, willNavigate, main) {
-		//  	if(main) console.log('Trying to navigate to: ' + url);
+		//  if(main) console.log('Trying to navigate to: ' + url);
 		//  console.log('Caused by: ' + type);
 		// 	console.log('Will actually navigate: ' + willNavigate);
 		});
@@ -220,6 +227,9 @@ function findRes(e) {
 		        console.log('Unable to load' + pageurl);
 		    }
 			page.evaluate(function () { 
+
+				// this part needs to be fixed
+				// sometimes give bad result
 				var style = document.createElement('style'),
 		  		text = document.createTextNode('body { background: #fff }');
 				style.setAttribute('type', 'text/css');
@@ -243,7 +253,6 @@ function findRes(e) {
 			if(!live) {
 				e.save(function(err) {
 		            if (err) return console.error(err);
-		            //console.log('saved to db');
 		            donecount++;
 		            console.info('Done '.green+ donecount);
 	            });	
@@ -266,15 +275,13 @@ function findUrl() {
 	var url1 = "http://wwwranking.webdatacommons.org/Q/?pageIndex=";
 	var url2 = "&pageSize=";
 
-	j=0
+	j=0;
 	var timer = setInterval (function() {
 		url3 = url1+j+url2+pageSize;		//complete url
 		console.log('url3 = '+url3);
 		download(url3, function(data) {
 	  		if (data) {
-		    	//console.log(data);
 		   		var json = JSON.parse(data);
-		    	//console.log(json_string);
 		    	for(i=0; i<pageSize; i++){
 		    		html = (json['data'][i]['harmonic']);
 		    		$ = cheerio.load(html);
@@ -286,21 +293,22 @@ function findUrl() {
 			j++;
 		});
 
-		// This part not working
-		if(j == pageNo) clearInterval(timer);
+		if(j == (pageNo-1)) {
+			clearInterval(timer);
+			console.log('stopped fetching urls');
+		}
 
 	}, 10000)
 }
 
 //find ranks of all the urls present in the db
 //also calls addData
+var adone=0;
 function findData () {
     Data.find(function(err, all) {
+    	console.log(all.length);
         all.forEach(function(element,index,array) {
-            if(element.arank==null) {
-                console.log('searching rank for ' + element.url);
-                addData(element);
-            }
+
         })
     })
 }
@@ -328,9 +336,11 @@ function addgpsi(e, strategy) {
 	    var json = JSON.parse(data);
 	    if(strategy == 'desktop') e.psid = json;
 	    else if(strategy =='mobile') e.psim = json;
-//	    e.markModified('gpsi');
-//	    console.log(e);
-	    if(!live) e.save();
+	    if(!live) {
+	    	if(strategy == 'desktop') e.markModified('psid');
+	    	else if(strategy =='mobile') e.markModified('psim');
+	    	e.save();
+	    }
 	  }
 	  else console.log("error");
 	});
@@ -380,7 +390,7 @@ function addUrls(url) {
 				
 			} 
 			if(arr.length==0) {
-				var page = new Data({ url: url ,arank:''})
+				var page = new Data({ url: url })
 				page.save(function(err) {
 					if (err) return console.error(err);
 	  				//console.log('saved');
@@ -393,42 +403,53 @@ function addUrls(url) {
 			}
 		})
 	}
-
-//	datas.push(new dataf(url));
-	//console.log(link);
-    
-	//	console.log(rank);
-    //datas[i].arank = rank;
 }
+
 nacount=0;
 //refactor alexa ranks
 function addData(e) {
+	if(e.arank==null) {
+	console.log('Fetching alexa data for -> ' + e.url);
 	link = e.url;
 	var aurl = 'http://data.alexa.com/data?cli=10&dat=snbamz&url='+ link;
     var rank;
     request(aurl, function (error, response, xml) {
     	if (!error && response.statusCode == 200) {
+    		parseString(xml, function (err, result) {
+			    e.alexa = result.ALEXA;
+			    e.markModified('alexa');
+                if(!live) {
+		    		e.save(function(err) {
+		            	if (err) return console.error(err);
+		            	adone++;
+		            	console.log('Alexa Done '.green + adone);
+		            })	
+	    		}
+			});
+			/*
     		var $ = cheerio.load(xml, {
     			xmlMode:true
     		});
             rank = $('REACH').attr('RANK');
-            e.ltime = $('SPEED').attr('TEXT');
-    		e.ptime = $('SPEED').attr('PCT');
-
+			e.ltime = $('SPEED').attr('TEXT');
+			e.ptime = $('SPEED').attr('PCT');
     		if(rank) {
-                //console.log(rank);
                 e.arank = rank;
+                if(!live) {
+		    		e.save(function(err) {
+		            	if (err) return console.error(err);
+		            	adone++;
+		            	console.log('Alexa Done '.green + adone);
+		            })	
+	    		}
             }
     		else if(typeof rank === 'undefined') {
     			console.log ('Rank for '+aurl+ ' not available.');
     		}
-    		if(!live) {
-	    		e.save(function(err) {
-	            	if (err) return console.error(err);
-	                //console.log('saved');
-	            })	
-    		}
+    		*/
     	}
     	else console.log('Error fetching alexa data for '+ aurl);
     });
+	}
+	else console.log ('Alexa Data already present');
 }
