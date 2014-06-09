@@ -1,21 +1,21 @@
 var system = require('system');
 args = system.args;
-var i=0;
+var i = 0;
 var webPage = require('webpage');
 var page = webPage.create();
 String.prototype.endsWith = function(suffix) {
-    return this.indexOf(suffix, this.length - suffix.length) !== -1;
+  return this.indexOf(suffix, this.length - suffix.length) !== -1;
 };
 page.onResourceRequested = function(requestData, networkRequest) {
-	var url = requestData.url;
-	//console.log(url);
-	if(url.endsWith('js'))	 {
-//		hostname = gethost(url);
-		console.log('id: \t'+requestData.id + '\t'+ url);
-	}
-	//networkRequest.abort();
-//	console.log('id: \t'+requestData.id + '\t host: \t'+ hostname);
-	//networkRequest.abort();
+  var url = requestData.url;
+  //console.log(url);
+  if (url.endsWith('js')) {
+    //		hostname = gethost(url);
+    console.log('id: \t' + requestData.id + '\t' + url);
+  }
+  //networkRequest.abort();
+  //	console.log('id: \t'+requestData.id + '\t host: \t'+ hostname);
+  //networkRequest.abort();
 };
 
 page.onLoadFinished = function(status) {
@@ -23,25 +23,25 @@ page.onLoadFinished = function(status) {
   page.close();
 };
 
-var gethost = function (href) {
-	var l = document.createElement("a");
-	l.href = href;
-	return l.hostname;
+var gethost = function(href) {
+  var l = document.createElement("a");
+  l.href = href;
+  return l.hostname;
 }
 url = args[1];
 
-page.open(url);//
+page.open(url); //
 
 var page = webPage.create();
-page.open(url);//
-	
+page.open(url); //
+
 function next(status) {
-	console.log('Status: ' + status);
-	i++;
-	console.log('---'+i);
-	//if(i<4) page.open(url, next(status));
-	phantom.exit();
-  	// Do other things here...	
+  console.log('Status: ' + status);
+  i++;
+  console.log('---' + i);
+  //if(i<4) page.open(url, next(status));
+  phantom.exit();
+  // Do other things here...	
 }
 page.render('./sshot.png');
 mongoose part not working
