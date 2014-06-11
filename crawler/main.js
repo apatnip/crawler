@@ -27,10 +27,10 @@ var psimMode = true;		// get PageSpeed Insights for mobile
 var resTimeout = 60000;		// Resource timeout
 var pageSize=1000;			// Get data from wwwranking in slots of?
 var pageNo=10;				// No of slots
-var colName = 'thoupages';		// Collection name
+var colName = 'thoupages';	// Collection name
 
 var loadImage = true;		
-var live=false;
+var live=true;
 var addwCheck = true;		// Add to db with check if already exists
 var qprint = false;			// whether print database
 
@@ -43,7 +43,7 @@ var executeInterval = 5000;
 
 var emitter = new events.EventEmitter();
 
-//for serverLive.js
+// live version required for serverLive.js
 exports.out = function (url, res) {
  	res.writeHead(200, {"Content-Type": "application/json"});
 	console.log('got request for -> '+url);
@@ -73,24 +73,22 @@ exports.out = function (url, res) {
 };
 
 //Connect to db
+db = require('./model/db'),
+Data = mongoose.model(colName);
+var con = mongoose.connection;
+con.on('error', console.error.bind(console, 'connection error:'));
+con.once('open', function callback () {
 
-if(!live) {
-	db = require('./model/db'),
-	Data = mongoose.model(colName);
-	var con = mongoose.connection;
-	con.on('error', console.error.bind(console, 'connection error:'));
-	con.once('open', function callback () {
+/****************Most Important Calls***************/
 
-	/****************Most Important Calls***************/
+	if(qprint) printData(Data);
+	if(qfindurls) findUrl();
+	if(!live) execute();
 
-		if(qprint) printData(Data);
-		if(qfindurls) findUrl();
-		if(!live) execute();
+/***************************************************/
+	
+});
 
-	/***************************************************/
-		
-	});
-}
 function execute() {
 	Data.find(query, function(err, arr) {
 		var add = 0;
@@ -227,14 +225,6 @@ function findRes(e) {
 		        console.log('Unable to load' + pageurl);
 		    }
 			page.evaluate(function () { 
-
-				// this part needs to be fixed
-				// sometimes give bad result
-				var style = document.createElement('style'),
-		  		text = document.createTextNode('body { background: #fff }');
-				style.setAttribute('type', 'text/css');
-				style.appendChild(text);
-				document.head.insertBefore(style, document.head.firstChild);
 				return document; }, function (document) {
 			//now actually done
 			
