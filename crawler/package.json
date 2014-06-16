@@ -1,15 +1,16 @@
-{ 
+{
   "name": "connecto-intern",
   "version": "0.0.1",
   "description": "This module automate the process of getting JS, CSS, and Screen Shots",
-  "author": ["Amar Sharma <amar@thoughtfabrics.com>","Aseem Patni <aseem@thoughtfabrics.com>"],
-  	"dependencies" :
-  { 
-  	"cheerio" : "*"
-  , "mongoose" : "* "
-  , "request" : "*"
-  , "phantom" : "*"
-  , "commander" : ">=2.2.0"
-  , "lodash" : "*"
+  "author": ["Amar Sharma <amar@thoughtfabrics.com>", "Aseem Patni <aseem@thoughtfabrics.com>"],
+  "dependencies": {
+    "cheerio": "*",
+    "mongoose": "* ",
+    "request": "*",
+    "phantom": "*",
+    "commander": ">=2.2.0",
+    "lodash": "*",
+    "colors": "*",
+    "xml2js": "*"
   }
 }
