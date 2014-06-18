@@ -9,6 +9,10 @@ var events = require('events');
 var mongoose = require('mongoose');
 var fs = require('fs');
 var parseString = require('xml2js').parseString;
+var url = require('url')
+var adone = 0;
+
+// Default values of variables
 
 var https = require('https'),
   key = 'AIzaSyCRlhvnFqzGWcKOWRH64Wi8Bu2NMja0csE';
@@ -42,7 +46,7 @@ exports.init = function(file, isLive) {
   pageSize = configs.slots_NoOfUrlsToFetch;
   pageNo = configs.noOfSlots;
   loadImage = configs.screenShots;
-  live = isLive;
+  live = isLive == true;
 }
 
 // Configs yet to be written
@@ -73,10 +77,12 @@ exports.liveServer = function(url, res) {
     console.log('Crashed: '.red + crash.url);
     res.end(url + ' sucks :-P ' + 'It crashed!!\n');
   });
-  findRes(e);
-  addData(e);
-  addgpsi(e, 'desktop');
-  addgpsi(e, 'mobile');
+
+  if (jsMode) findRes(e);
+  if (psidMode) addgpsi(e, 'desktop');
+  if (psimMode) addgpsi(e, 'mobile');
+  if (alexaMode) addData(e);
+
   emitter.on('done', function() {
     res.end(JSON.stringify(e, null, 2) + '\n');
     /*
@@ -94,19 +100,22 @@ exports.liveServer = function(url, res) {
 //Connect to db
 db = require('./model/db'),
 Data = mongoose.model(colName);
-var con = mongoose.connection;
-con.on('error', console.error.bind(console, 'connection error:'));
-con.once('open', function callback() {
 
-  /****************Most Important Calls***************/
+exports.automate = function() {
+  var con = mongoose.connection;
+  con.on('error', console.error.bind(console, 'connection error:'));
+  con.once('open', function callback() {
 
-  if (qprint) printData(Data);
-  if (qfindurls) findUrl();
-  if (!live) execute();
+    /****************Most Important Calls***************/
 
-  /***************************************************/
+    if (qprint) printData(Data);
+    if (qfindurls) findUrl();
+    if (!live) execute();
 
-});
+    /***************************************************/
+
+  });
+}
 
 function execute() {
   Data.find(query, function(err, arr) {
@@ -157,7 +166,7 @@ function testextjs(url, host) {
   if (url.contains(host)) return false;
   else return true;
 }
-url = require('url')
+
 var gethost = function(href) {
   urlo = url.parse(href);
   return urlo.host;
@@ -258,7 +267,7 @@ function findRes(e) {
 
           e.title = document.title;
           if (loadImage == true) {
-            var path = 'img/' + host;
+            var path = 'screenshots/' + host;
             page.render('./' + path, {
               format: 'jpeg',
               quality: '60'
@@ -319,7 +328,6 @@ function findUrl() {
 
 //find ranks of all the urls present in the db
 //also calls addData
-var adone = 0;
 
 function findData() {
   Data.find(function(err, all) {
@@ -426,7 +434,6 @@ function addUrls(url) {
   }
 }
 
-nacount = 0;
 //refactor alexa ranks
 function addData(e) {
   if (e.arank == null) {

@@ -1,0 +1,30 @@
+{
+  "RESTServerport": 80,
+  "googleAPI": "AIzaSyCRlhvnFqzGWcKOWRH64Wi8Bu2NMja0csE",
+  "APIurl": "http://www.connecto.io",
+
+  "dbServer": "localhost",
+  "dbPort": 27017,
+
+  "getAlexa": true,
+  "getNewUrls": false,
+  "getJs": true,
+  "pageInsightD": true,
+  "pageInsightM": true,
+
+  "takeScrShot": true,
+  "desktopScreen": {
+    "width": 1366,
+    "height": 768
+  },
+  "mobileScreen": {
+    "width": 320,
+    "height": 480
+  },
+  "scrShotRenderDelay": 2500,
+  "screenShots": true,
+  "bgWhite": true,
+  "resourceTimeOut": 60000,
+  "slots_NoOfUrlsToFetch": 1,
+  "noOfSlots": 10
+}

@@ -19,7 +19,7 @@ var createScrShots = function() {
 
   configs.urls.forEach(function(site) {
     var x = url.parse(site);
-    webshot(site, 'screenshots/' + x.hostname + '-m.png', options, function(err) {
+    webshot(site, 'screenshots/' + x.hostname + '-m.jpeg', options, function(err) {
       if (err != null)
         console.log(" Error : " + err);
     });

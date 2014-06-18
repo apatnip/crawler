@@ -1,3 +1,8 @@
+require('nodetime').profile({
+  accountKey: 'f386371afe93c5ac0d88f36fa4e355d6907580c1',
+  appName: 'Crappy'
+});
+
 var program = require('commander'),
   http = require('http'),
   main = require('./main');
@@ -28,7 +33,7 @@ if (program.automate) {
     program.help();
   console.log("Started live server on " + config.RESTServerport);
   http.createServer(function(req, res) {
-    if (req.url != '/favicon.ico') {
+    if (req.url != '/favicon.ico' && req.url != null) {
       main.liveServer(req.url.replace('/', ''), res);
     }
   }).listen(config.RESTServerport);
