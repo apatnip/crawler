@@ -1,8 +1,3 @@
-require('nodetime').profile({
-  accountKey: 'f386371afe93c5ac0d88f36fa4e355d6907580c1',
-  appName: 'Crappy'
-});
-
 var program = require('commander'),
   http = require('http'),
   main = require('./main');
