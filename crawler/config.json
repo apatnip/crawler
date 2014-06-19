@@ -1,6 +1,6 @@
 {
-  "RESTServerport": 80,
-  "googleAPI": "AIzaSyCRlhvnFqzGWcKOWRH64Wi8Bu2NMja0csE",
+  "RESTServerport": 8888,
+  "googleAPI": "AIzaSyDP18DJHojJMOyVdjjtcZDVfxVDCHfXpj4",
   "APIurl": "http://www.connecto.io",
 
   "dbServer": "localhost",

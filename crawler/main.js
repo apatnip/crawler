@@ -1,5 +1,6 @@
 var args = process.argv;
 var http = require("http");
+var https = require('https');
 var request = require('request');
 var mongoose = require('mongoose');
 var cheerio = require('cheerio');
@@ -13,9 +14,7 @@ var url = require('url')
 var adone = 0;
 
 // Default values of variables
-
-var https = require('https'),
-  key = 'AIzaSyCRlhvnFqzGWcKOWRH64Wi8Bu2NMja0csE';
+var key = 'AIzaSyDP18DJHojJMOyVdjjtcZDVfxVDCHfXpj4';
 
 //GET parameters
 var qfindurls = false; // Whether add urls from www ranking
@@ -60,15 +59,14 @@ var noofpages = 4;
 var slots = 2;
 var executeInterval = 5000;
 
-var emitter = new events.EventEmitter();
-
 // live version required for serverLive.js
 exports.liveServer = function(url, res) {
+	var emitter = new events.EventEmitter();
   res.writeHead(200, {
     "Content-Type": "application/json"
   });
   console.log('got request for -> ' + url);
-  e = new Data({
+  var e = new Data({
     url: url
   });
   var crash = phantom.crash(url);
@@ -78,7 +76,7 @@ exports.liveServer = function(url, res) {
     res.end(url + ' sucks :-P ' + 'It crashed!!\n');
   });
 
-  if (jsMode) findRes(e);
+  if (jsMode) findRes(e, emitter);
   if (psidMode) addgpsi(e, 'desktop');
   if (psimMode) addgpsi(e, 'mobile');
   if (alexaMode) addData(e);
@@ -181,7 +179,7 @@ var gethost = function(href) {
 
 donecount = 0;
 
-function findRes(e) {
+function findRes(e, emitter) {
   var pageurl = e.url;
   var crash = phantom.crash(pageurl);
   crash.once('error', function() {
