@@ -1,8 +1,6 @@
 var args = process.argv;
 var http = require("http");
-var https = require('https');
 var request = require('request');
-var mongoose = require('mongoose');
 var cheerio = require('cheerio');
 var colors = require('colors');
 var phantom = require('phantom');
@@ -12,9 +10,9 @@ var fs = require('fs');
 var parseString = require('xml2js').parseString;
 var url = require('url')
 var adone = 0;
+var psi = require('./psi');
 
 // Default values of variables
-var key = 'AIzaSyDP18DJHojJMOyVdjjtcZDVfxVDCHfXpj4';
 
 //GET parameters
 var qfindurls = false; // Whether add urls from www ranking
@@ -32,9 +30,15 @@ var pageNo = 10; // No of slots
 
 var loadImage = true;
 var live = true;
-
+var configs;
 exports.init = function(file, isLive) {
-  var configs = require(file);
+  // Get config file
+  configs = require(file);
+
+  // Call init for other files
+  psi.init(configs, isLive);
+  
+  // Set parameter values
   key = configs.googleAPI;
   qfindurls = configs.getNewUrls;
   alexaMode = configs.getAlexa;
@@ -55,7 +59,7 @@ var qprint = false; // whether print database
 
 // automated config
 var query = {};
-var noofpages = 4;
+var noofpages = 4; // 0 for execution on all the results of the query
 var slots = 2;
 var executeInterval = 5000;
 
@@ -77,8 +81,8 @@ exports.liveServer = function(url, res) {
   });
 
   if (jsMode) findRes(e, emitter);
-  if (psidMode) addgpsi(e, 'desktop');
-  if (psimMode) addgpsi(e, 'mobile');
+  if (psidMode) psi.append(e, 'desktop');
+  if (psimMode) psi.append(e, 'mobile');
   if (alexaMode) addData(e);
 
   emitter.on('done', function() {
@@ -130,8 +134,8 @@ function execute() {
         e = arr[i];
         console.log('( %d ) ' + e.url.bold, i + 1);
         if (jsMode) findRes(e);
-        if (psidMode) addgpsi(e, 'desktop');
-        if (psimMode) addgpsi(e, 'mobile');
+        if (psidMode) psi.append(e, 'desktop');
+        if (psimMode) psi.append(e, 'mobile');
         if (alexaMode) addData(e);
       }
       add += slots;
@@ -145,40 +149,34 @@ String.prototype.endsWith = function(suffix) {
 String.prototype.contains = function(it) {
   return this.indexOf(it) != -1;
 };
-
 function testjs(url, type) {
   if (url.endsWith('.js')) return true;
   else if (url.contains('.js?')) return true;
   else if (type != null && type.contains('javascript')) return true;
   return false;
 }
-
 function testcss(url, type) {
   if (url.endsWith('.css')) return true;
   else if (url.contains('.css?')) return true;
   else if (type != null && type.contains('css')) return true;
   return false;
 }
-
 function testextjs(url, host) {
   if (url.contains(host)) return false;
   else return true;
 }
-
 var gethost = function(href) {
   urlo = url.parse(href);
   return urlo.host;
 }
-
-  function testimg(url, type) {
-    if (url.endsWith('.jpg')) return true;
-    if (url.endsWith('.png')) return true;
-    if (url.endsWith('.gif')) return true;
-    return false;
-  }
+function testimg(url, type) {
+  if (url.endsWith('.jpg')) return true;
+  if (url.endsWith('.png')) return true;
+  if (url.endsWith('.gif')) return true;
+  return false;
+}
 
 donecount = 0;
-
 function findRes(e, emitter) {
   var pageurl = e.url;
   var crash = phantom.crash(pageurl);
@@ -274,7 +272,6 @@ function findRes(e, emitter) {
             e.capture = path + '.jpeg';
           }
           e.js = extjsarr;
-
           if (!live) {
             e.save(function(err) {
               if (err) return console.error(err);
@@ -284,8 +281,8 @@ function findRes(e, emitter) {
           } else {
             emitter.emit('done');
           }
-
           console.log(e);
+          page.close();
           ph.exit();
         });
       });
@@ -324,18 +321,6 @@ function findUrl() {
   }, 10000)
 }
 
-//find ranks of all the urls present in the db
-//also calls addData
-
-function findData() {
-  Data.find(function(err, all) {
-    console.log(all.length);
-    all.forEach(function(element, index, array) {
-
-    })
-  })
-}
-
 // Utility function that downloads a URL and invokes
 // callback with the data.
 function download(url, callback) {
@@ -348,41 +333,6 @@ function download(url, callback) {
       callback(data);
     });
   }).on("error", function() {
-    callback(null);
-  });
-}
-
-function addgpsi(e, strategy) {
-  var url = e.url;
-  getgpsi(url, strategy, function(data) {
-    if (data) {
-      var json = JSON.parse(data);
-      if (strategy == 'desktop') e.psid = json;
-      else if (strategy == 'mobile') e.psim = json;
-      if (!live) {
-        if (strategy == 'desktop') e.markModified('psid');
-        else if (strategy == 'mobile') e.markModified('psim');
-        e.save();
-      }
-    } else console.log("error");
-  });
-}
-
-function getgpsi(url, strategy, callback) {
-  https.get({
-    host: 'www.googleapis.com',
-    path: '/pagespeedonline/v1/runPagespeed?url=' + encodeURIComponent(url) +
-      '&key=' + key + '&strategy=' + strategy
-  }, function(res) {
-    var data = "";
-    res.on('data', function(chunk) {
-      data += chunk;
-    });
-    res.on("end", function() {
-      callback(data);
-    });
-  }).on("error", function(err) {
-    console.log(err);
     callback(null);
   });
 }
@@ -413,7 +363,7 @@ function addUrls(url) {
       console.log('searching ' + url);
       //console.log(arr);
       if (err) {
-
+        console.log(err);
       }
       if (arr.length == 0) {
         var page = new Data({
@@ -421,12 +371,10 @@ function addUrls(url) {
         })
         page.save(function(err) {
           if (err) return console.error(err);
-          //console.log('saved');
         })
-        console.log('not found');
+        console.log(url+ ' added to '+ colName);
       } else {
-        console.log('already present');
-        //console.log(arr[0].url);
+        console.log(url + ' is already present.');
       }
     })
   }
@@ -461,13 +409,6 @@ function addData(e) {
 			e.ptime = $('SPEED').attr('PCT');
     		if(rank) {
                 e.arank = rank;
-                if(!live) {
-		    		e.save(function(err) {
-		            	if (err) return console.error(err);
-		            	adone++;
-		            	console.log('Alexa Done '.green + adone);
-		            })	
-	    		}
             }
     		else if(typeof rank === 'undefined') {
     			console.log ('Rank for '+aurl+ ' not available.');
