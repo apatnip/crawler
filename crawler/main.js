@@ -9,7 +9,6 @@ var mongoose = require('mongoose');
 var fs = require('fs');
 var parseString = require('xml2js').parseString;
 var url = require('url')
-var adone = 0;
 var psi = require('./psi');
 
 // Default values of variables
@@ -63,43 +62,91 @@ var noofpages = 4; // 0 for execution on all the results of the query
 var slots = 2;
 var executeInterval = 5000;
 
-// live version required for serverLive.js
-exports.liveServer = function(url, res) {
-	var emitter = new events.EventEmitter();
-  res.writeHead(200, {
-    "Content-Type": "application/json"
-  });
-  console.log('got request for -> ' + url);
-  var e = new Data({
-    url: url
-  });
-  var crash = phantom.crash(url);
-  crash.on('error', function() {
-    e.crash = true;
-    console.log('Crashed: '.red + crash.url);
-    res.end(url + ' sucks :-P ' + 'It crashed!!\n');
-  });
+// Queue config
+var concurrentProcessing = 2;
 
+
+var pool = [];
+var processing = [];
+
+pool.push = function (request){
+  e = request.obj;
+  console.log('Adding %s to pool', e.url);
+  x = Array.prototype.push.apply(this,arguments);
+  printpool();
+  if(processing.length<concurrentProcessing) {
+    console.log('%d jobs processing', processing.length);
+    processing.push((pool.splice(0,1))[0]);
+  }
+  return x;
+}
+
+processing.push = function (process){
+  e = process.obj;
+  console.log('%s is now processing', e.url);
+  emitter = process.emitter;
+  x = Array.prototype.push.apply(this,arguments);
+  printpool();
   if (jsMode) findRes(e, emitter);
   if (psidMode) psi.append(e, 'desktop');
   if (psimMode) psi.append(e, 'mobile');
   if (alexaMode) addData(e);
+  return x;
+}
 
-  emitter.on('done', function() {
-    res.end(JSON.stringify(e, null, 2) + '\n');
+function printpool() {
+  console.log('Pool contains: ');
+  for(i=0; i<pool.length; i++) {
+    console.log('( %d ) %s',i,pool[i].obj.url);
+  }  
+  console.log('Now processing: ');
+  for(i=0; i<processing.length; i++) {
+    console.log('( %d ) %s',i,processing[i].obj.url);
+  }
+}
+
+// live version required for serverLive.js
+exports.liveServer = function(url, res) {
+  res.writeHead(200, {
+    "Content-Type": "application/json"
+  });
+  console.log('got request for -> ' + url);
+  var request = {};
+  request.obj = new Data({
+    url: url
+  });;
+  request.emitter = new events.EventEmitter();
+  pool.push(request);
+  var crash = phantom.crash(url);
+  crash.on('error', function() {
+    request.obj.crash = true;
+    console.log('Crashed: '.red + crash.url);
+    res.end(url + ' sucks :-P ' + 'It crashed!!\n');
+  });
+/*
+  if (jsMode) findRes(e, emitter);
+  if (psidMode) psi.append(e, 'desktop');
+  if (psimMode) psi.append(e, 'mobile');
+  if (alexaMode) addData(e);
+*/
+  request.emitter.on('done', function() {
+    processing.splice(processing.indexOf(request),1);
+    printpool();
+    if(pool.length>0) processing.push((pool.splice(0,1))[0]);
+    res.end(JSON.stringify(request.obj, null, 2) + '\n');
     /*
-	    path = './'+e.capture;
-	    console.log(path);
-	    fs.readFile(path, function(error, file) {
-		    if(error) console.log('Error reading file');
-		    var imagedata = new Buffer(file).toString('base64');
-		    res.write("hi there!<img src='data:my_pic.jpg;base64,"+imagedata+"'/>");
-	    });
-    	*/
+    path = './'+e.capture;
+    console.log(path);
+    fs.readFile(path, function(error, file) {
+	    if(error) console.log('Error reading file');
+	    var imagedata = new Buffer(file).toString('base64');
+	    res.write("hi there!<img src='data:my_pic.jpg;base64,"+imagedata+"'/>");
+    });
+    */
   });
 };
 
-//Connect to db
+// Connect to db
 db = require('./model/db'),
 Data = mongoose.model(colName);
 
@@ -108,13 +155,13 @@ exports.automate = function() {
   con.on('error', console.error.bind(console, 'connection error:'));
   con.once('open', function callback() {
 
-    /****************Most Important Calls***************/
+    /**********Most Important Calls**********/
 
     if (qprint) printData(Data);
     if (qfindurls) findUrl();
     if (!live) execute();
 
-    /***************************************************/
+    /****************************************/
 
   });
 }
@@ -313,9 +360,9 @@ function findUrl() {
       j++;
     });
 
-    if (j == (pageNo - 1)) {
+    if (j == (pageNo - 1)) { //
       clearInterval(timer);
-      console.log('stopped fetching urls');
+      console.log('Fetching URLs is over.');
     }
 
   }, 10000)
@@ -337,7 +384,7 @@ function download(url, callback) {
   });
 }
 
-//print existing data
+// Print existing data
 function printData(urls) {
   urls.find(function(err, urls) {
     if (err) return console.error(err);
@@ -345,7 +392,7 @@ function printData(urls) {
   })
 }
 
-//refactor urls
+// Refactor urls
 function addUrls(url) {
   if (!addwCheck) { //do without check in db
     var page = new Data({
@@ -361,7 +408,6 @@ function addUrls(url) {
       url: url
     }, function(err, arr) {
       console.log('searching ' + url);
-      //console.log(arr);
       if (err) {
         console.log(err);
       }
@@ -380,11 +426,12 @@ function addUrls(url) {
   }
 }
 
-//refactor alexa ranks
+// Refactor alexa ranks
+var adone = 0;
 function addData(e) {
-  if (e.arank == null) {
+  link = e.url;
+  if (e.alexa == null) {
     console.log('Fetching alexa data for -> ' + e.url);
-    link = e.url;
     var aurl = 'http://data.alexa.com/data?cli=10&dat=snbamz&url=' + link;
     var rank;
     request(aurl, function(error, response, xml) {
@@ -401,20 +448,17 @@ function addData(e) {
           }
         });
         /*
-    		var $ = cheerio.load(xml, {
+        var $ = cheerio.load(xml, {
     			xmlMode:true
     		});
-            rank = $('REACH').attr('RANK');
-			e.ltime = $('SPEED').attr('TEXT');
-			e.ptime = $('SPEED').attr('PCT');
-    		if(rank) {
-                e.arank = rank;
-            }
+        rank = $('REACH').attr('RANK');
+  			e.ltime = $('SPEED').attr('TEXT');
+  			e.ptime = $('SPEED').attr('PCT');
+    		if(rank) e.arank = rank;
     		else if(typeof rank === 'undefined') {
     			console.log ('Rank for '+aurl+ ' not available.');
-    		}
-    		*/
-      } else console.log('Error fetching alexa data for ' + aurl);
+    		} */
+      } else console.log('Error fetching alexa data for ' + link);
     });
-  } else console.log('Alexa Data already present');
+  } else console.log('Alexa Data already present for '+ link);
 }
