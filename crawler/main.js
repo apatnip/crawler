@@ -319,6 +319,10 @@ function findRes(e, emitter) {
             e.capture = path + '.jpeg';
           }
           e.js = extjsarr;
+          $ = cheerio.load(document.all[0].outerHTML);
+          $('a').each(function(i, element) {
+            console.log(element);
+          })
           if (!live) {
             e.save(function(err) {
               if (err) return console.error(err);
