@@ -10,6 +10,7 @@ var fs = require('fs');
 var parseString = require('xml2js').parseString;
 var url = require('url')
 var psi = require('./psi');
+var spawn = require('child_process').spawn;
 
 // Default values of variables
 
@@ -307,38 +308,60 @@ function findRes(e, emitter) {
         if (status !== 'success') {
           console.log('Unable to load' + pageurl);
         }
-        page.evaluate(function() {
-          return document;
-        }, function(document) {
-          //now actually done
+        page.includeJs("http://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js", function() {
+          page.evaluate(function() {
+            var object = [];
+            $("a").each(function() {
+              var aTag = $(this);
+              var rect = aTag[0].getBoundingClientRect();
+              if (rect.height != 0 && rect.width != 0)
+                object.push(JSON.stringify(rect));
+            });
 
-          e.title = document.title;
-          if (loadImage == true) {
-            var path = 'screenshots/' + host;
-            page.render('./' + path, {
-              format: 'jpeg',
-              quality: '60'
+            return object;
+          }, function(object) {
+            //now actually done
+            fs.writeFile(host, JSON.stringify(object), afterWrite);
+            //e.title = document.title;
+            if (loadImage == true) {
+              var path = 'screenshots/' + host;
+              page.render('./' + path, {
+                format: 'jpeg',
+                quality: '60'
+              });
+              //console.log('page rendered at ' + path);
+              e.capture = path;
+            }
+            e.js = extjsarr;
+
+            if (!live) {
+              e.save(function(err) {
+                if (err) return console.error(err);
+                donecount++;
+                console.info('Done '.green + donecount);
+              });
+            } else {
+              emitter.emit('done');
+            }
+            console.log(e);
+            page.close();
+            ph.exit();
+          });
+
+          function afterWrite() {
+            console.log('Forking Python')
+            var pyChild = spawn('python', ['analyzerUtil.py', host, e.capture], {
+              stdio: [null, null, null, 'ipc']
             });
-            //console.log('page rendered at ' + path);
-            e.capture = path + '.jpeg';
-          }
-          e.js = extjsarr;
-          $ = cheerio.load(document.all[0].outerHTML);
-          $('a').each(function(i, element) {
-            console.log(element);
-          })
-          if (!live) {
-            e.save(function(err) {
-              if (err) return console.error(err);
-              donecount++;
-              console.info('Done '.green + donecount);
+            pyChild.stdout.on('data', function(data) {
+              console.log('Py stdout: ' + data);
             });
-          } else {
-            emitter.emit('done');
+            pyChild.on('message', function(message) {
+              console.log('Received message...');
+              console.log(message);
+            });
+            //ph.exit();
           }
-          console.log(e);
-          page.close();
-          ph.exit();
         });
       });
     });
