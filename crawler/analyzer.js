@@ -5,7 +5,7 @@ var image = 'logo.jpg';
 var spawn = require('child_process').spawn;
 phantom.create(function(ph) {
   ph.createPage(function(page) {
-    page.open("http://connecto.io", function(status) {
+    page.open("http://mangalmay.org", function(status) {
       console.log("opened website ", status);
       page.includeJs("http://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js", function() {
         page.evaluate(function() {
