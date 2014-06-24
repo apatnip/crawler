@@ -36,7 +36,7 @@ exports.init = function(file, isLive) {
 
   // Call init for other files
   psi.init(configs, isLive);
-  
+
   // Set parameter values
   key = configs.googleAPI;
   qfindurls = configs.getNewUrls;
@@ -65,27 +65,26 @@ var executeInterval = 5000;
 // Queue config
 var concurrentProcessing = 2;
 
-
 var pool = [];
 var processing = [];
 
-pool.push = function (request){
+pool.push = function(request) {
   e = request.obj;
   console.log('Adding %s to pool', e.url);
-  x = Array.prototype.push.apply(this,arguments);
+  x = Array.prototype.push.apply(this, arguments);
   printpool();
-  if(processing.length<concurrentProcessing) {
+  if (processing.length < concurrentProcessing) {
     console.log('%d jobs processing', processing.length);
-    processing.push((pool.splice(0,1))[0]);
+    processing.push((pool.splice(0, 1))[0]);
   }
   return x;
 }
 
-processing.push = function (process){
+processing.push = function(process) {
   e = process.obj;
   console.log('%s is now processing', e.url);
   emitter = process.emitter;
-  x = Array.prototype.push.apply(this,arguments);
+  x = Array.prototype.push.apply(this, arguments);
   printpool();
   if (jsMode) findRes(e, emitter);
   if (psidMode) psi.append(e, 'desktop');
@@ -96,12 +95,12 @@ processing.push = function (process){
 
 function printpool() {
   console.log('Pool contains: ');
-  for(i=0; i<pool.length; i++) {
-    console.log('( %d ) %s',i,pool[i].obj.url);
-  }  
+  for (i = 0; i < pool.length; i++) {
+    console.log('( %d ) %s', i, pool[i].obj.url);
+  }
   console.log('Now processing: ');
-  for(i=0; i<processing.length; i++) {
-    console.log('( %d ) %s',i,processing[i].obj.url);
+  for (i = 0; i < processing.length; i++) {
+    console.log('( %d ) %s', i, processing[i].obj.url);
   }
 }
 
@@ -123,16 +122,16 @@ exports.liveServer = function(url, res) {
     console.log('Crashed: '.red + crash.url);
     res.end(url + ' sucks :-P ' + 'It crashed!!\n');
   });
-/*
+  /*
   if (jsMode) findRes(e, emitter);
   if (psidMode) psi.append(e, 'desktop');
   if (psimMode) psi.append(e, 'mobile');
   if (alexaMode) addData(e);
 */
   request.emitter.on('done', function() {
-    processing.splice(processing.indexOf(request),1);
+    processing.splice(processing.indexOf(request), 1);
     printpool();
-    if(pool.length>0) processing.push((pool.splice(0,1))[0]);
+    if (pool.length > 0) processing.push((pool.splice(0, 1))[0]);
     res.end(JSON.stringify(request.obj, null, 2) + '\n');
     /*
     path = './'+e.capture;
@@ -196,18 +195,21 @@ String.prototype.endsWith = function(suffix) {
 String.prototype.contains = function(it) {
   return this.indexOf(it) != -1;
 };
+
 function testjs(url, type) {
   if (url.endsWith('.js')) return true;
   else if (url.contains('.js?')) return true;
   else if (type != null && type.contains('javascript')) return true;
   return false;
 }
+
 function testcss(url, type) {
   if (url.endsWith('.css')) return true;
   else if (url.contains('.css?')) return true;
   else if (type != null && type.contains('css')) return true;
   return false;
 }
+
 function testextjs(url, host) {
   if (url.contains(host)) return false;
   else return true;
@@ -216,14 +218,16 @@ var gethost = function(href) {
   urlo = url.parse(href);
   return urlo.host;
 }
-function testimg(url, type) {
-  if (url.endsWith('.jpg')) return true;
-  if (url.endsWith('.png')) return true;
-  if (url.endsWith('.gif')) return true;
-  return false;
-}
+
+  function testimg(url, type) {
+    if (url.endsWith('.jpg')) return true;
+    if (url.endsWith('.png')) return true;
+    if (url.endsWith('.gif')) return true;
+    return false;
+  }
 
 donecount = 0;
+
 function findRes(e, emitter) {
   var pageurl = e.url;
   var crash = phantom.crash(pageurl);
@@ -418,7 +422,7 @@ function addUrls(url) {
         page.save(function(err) {
           if (err) return console.error(err);
         })
-        console.log(url+ ' added to '+ colName);
+        console.log(url + ' added to ' + colName);
       } else {
         console.log(url + ' is already present.');
       }
@@ -428,6 +432,7 @@ function addUrls(url) {
 
 // Refactor alexa ranks
 var adone = 0;
+
 function addData(e) {
   link = e.url;
   if (e.alexa == null) {
@@ -460,5 +465,5 @@ function addData(e) {
     		} */
       } else console.log('Error fetching alexa data for ' + link);
     });
-  } else console.log('Alexa Data already present for '+ link);
+  } else console.log('Alexa Data already present for ' + link);
 }
