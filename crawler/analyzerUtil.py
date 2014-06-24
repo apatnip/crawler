@@ -19,7 +19,7 @@ for coordinate in data:
 	height = int(coordinate['height'])
 	width = int(coordinate['width'])
 	overlay = img.copy()
-	cv2.rectangle(img,(x,y),(x+width,y+height),(0,0,255),-1)
+	cv2.rectangle(img,(x,y),(x+width,y+height),(40,50,200),2)
 	opacity = 0.3
 	cv2.addWeighted(overlay, opacity, img, 1 - opacity, 0, img)
 

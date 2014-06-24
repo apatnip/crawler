@@ -1,15 +1,14 @@
 var args = process.argv;
 var http = require("http");
-var request = require('request');
 var cheerio = require('cheerio');
 var colors = require('colors');
 var phantom = require('phantom');
 var events = require('events');
 var mongoose = require('mongoose');
 var fs = require('fs');
-var parseString = require('xml2js').parseString;
 var url = require('url')
 var psi = require('./psi');
+var alexa = require('./alexa');
 var spawn = require('child_process').spawn;
 
 // Default values of variables
@@ -37,7 +36,7 @@ exports.init = function(file, isLive) {
 
   // Call init for other files
   psi.init(configs, isLive);
-
+  
   // Set parameter values
   key = configs.googleAPI;
   qfindurls = configs.getNewUrls;
@@ -66,6 +65,7 @@ var executeInterval = 5000;
 // Queue config
 var concurrentProcessing = 2;
 
+
 var pool = [];
 var processing = [];
 
@@ -80,28 +80,27 @@ pool.push = function(request) {
   }
   return x;
 }
-
-processing.push = function(process) {
+processing.push = function (process){
   e = process.obj;
   console.log('%s is now processing', e.url);
   emitter = process.emitter;
-  x = Array.prototype.push.apply(this, arguments);
+  x = Array.prototype.push.apply(this,arguments);
   printpool();
   if (jsMode) findRes(e, emitter);
   if (psidMode) psi.append(e, 'desktop');
   if (psimMode) psi.append(e, 'mobile');
-  if (alexaMode) addData(e);
+  if (alexaMode) alexa.append(e);
   return x;
 }
 
 function printpool() {
   console.log('Pool contains: ');
-  for (i = 0; i < pool.length; i++) {
-    console.log('( %d ) %s', i, pool[i].obj.url);
-  }
+  for(i=0; i<pool.length; i++) {
+    console.log('( %d ) %s',i,pool[i].obj.url);
+  }  
   console.log('Now processing: ');
-  for (i = 0; i < processing.length; i++) {
-    console.log('( %d ) %s', i, processing[i].obj.url);
+  for(i=0; i<processing.length; i++) {
+    console.log('( %d ) %s',i,processing[i].obj.url);
   }
 }
 
@@ -123,16 +122,18 @@ exports.liveServer = function(url, res) {
     console.log('Crashed: '.red + crash.url);
     res.end(url + ' sucks :-P ' + 'It crashed!!\n');
   });
-  /*
+  
+  // Moved to processing
+/*
   if (jsMode) findRes(e, emitter);
   if (psidMode) psi.append(e, 'desktop');
   if (psimMode) psi.append(e, 'mobile');
-  if (alexaMode) addData(e);
+  if (alexaMode) alexa.append(e);
 */
   request.emitter.on('done', function() {
-    processing.splice(processing.indexOf(request), 1);
+    processing.splice(processing.indexOf(request),1);
     printpool();
-    if (pool.length > 0) processing.push((pool.splice(0, 1))[0]);
+    if(pool.length>0) processing.push((pool.splice(0,1))[0]);
     res.end(JSON.stringify(request.obj, null, 2) + '\n');
     /*
     path = './'+e.capture;
@@ -183,7 +184,7 @@ function execute() {
         if (jsMode) findRes(e);
         if (psidMode) psi.append(e, 'desktop');
         if (psimMode) psi.append(e, 'mobile');
-        if (alexaMode) addData(e);
+        if (alexaMode) alexa.append(e);
       }
       add += slots;
     }, executeInterval);
@@ -196,21 +197,18 @@ String.prototype.endsWith = function(suffix) {
 String.prototype.contains = function(it) {
   return this.indexOf(it) != -1;
 };
-
 function testjs(url, type) {
   if (url.endsWith('.js')) return true;
   else if (url.contains('.js?')) return true;
   else if (type != null && type.contains('javascript')) return true;
   return false;
 }
-
 function testcss(url, type) {
   if (url.endsWith('.css')) return true;
   else if (url.contains('.css?')) return true;
   else if (type != null && type.contains('css')) return true;
   return false;
 }
-
 function testextjs(url, host) {
   if (url.contains(host)) return false;
   else return true;
@@ -219,13 +217,12 @@ var gethost = function(href) {
   urlo = url.parse(href);
   return urlo.host;
 }
-
-  function testimg(url, type) {
-    if (url.endsWith('.jpg')) return true;
-    if (url.endsWith('.png')) return true;
-    if (url.endsWith('.gif')) return true;
-    return false;
-  }
+function testimg(url, type) {
+  if (url.endsWith('.jpg')) return true;
+  if (url.endsWith('.png')) return true;
+  if (url.endsWith('.gif')) return true;
+  return false;
+}
 
 donecount = 0;
 
@@ -281,7 +278,7 @@ function findRes(e, emitter) {
       page.set('onResourceReceived', function(response) {
         if (response.stage == 'end') {
           var url = response.url;
-          //		console.log(url);
+          //    console.log(url);
           hosturl = gethost(url);
           type = response.contentType;
           if (testjs(url, type)) { // resource is js
@@ -302,7 +299,7 @@ function findRes(e, emitter) {
       page.set('onNavigationRequested', function(url, type, willNavigate, main) {
         //  if(main) console.log('Trying to navigate to: ' + url);
         //  console.log('Caused by: ' + type);
-        // 	console.log('Will actually navigate: ' + willNavigate);
+        //  console.log('Will actually navigate: ' + willNavigate);
       });
       page.open(pageurl, function(status) {
         if (status !== 'success') {
@@ -321,15 +318,16 @@ function findRes(e, emitter) {
             return object;
           }, function(object) {
             //now actually done
-            fs.writeFile(host, JSON.stringify(object), afterWrite);
+            
             //e.title = document.title;
             if (loadImage == true) {
               var path = 'screenshots/' + host;
               page.render('./' + path, {
                 format: 'jpeg',
                 quality: '60'
+              }, function() {
+                fs.writeFile(host, JSON.stringify(object), afterWrite);
               });
-              //console.log('page rendered at ' + path);
               e.capture = path;
             }
             e.js = extjsarr;
@@ -356,17 +354,20 @@ function findRes(e, emitter) {
             pyChild.stdout.on('data', function(data) {
               console.log('Py stdout: ' + data);
             });
+            pyChild.stderr.on('data',function(data) {
+              console.log('Py err: ' + data);
+            });
             pyChild.on('message', function(message) {
               console.log('Received message...');
               console.log(message);
             });
-            //ph.exit();
           }
         });
       });
     });
   });
 }
+
 
 //find all the urls from wwwranking
 //also calls addurl
@@ -449,48 +450,10 @@ function addUrls(url) {
         page.save(function(err) {
           if (err) return console.error(err);
         })
-        console.log(url + ' added to ' + colName);
+        console.log(url+ ' added to '+ colName);
       } else {
         console.log(url + ' is already present.');
       }
     })
   }
-}
-
-// Refactor alexa ranks
-var adone = 0;
-
-function addData(e) {
-  link = e.url;
-  if (e.alexa == null) {
-    console.log('Fetching alexa data for -> ' + e.url);
-    var aurl = 'http://data.alexa.com/data?cli=10&dat=snbamz&url=' + link;
-    var rank;
-    request(aurl, function(error, response, xml) {
-      if (!error && response.statusCode == 200) {
-        parseString(xml, function(err, result) {
-          e.alexa = result.ALEXA;
-          e.markModified('alexa');
-          if (!live) {
-            e.save(function(err) {
-              if (err) return console.error(err);
-              adone++;
-              console.log('Alexa Done '.green + adone);
-            })
-          }
-        });
-        /*
-        var $ = cheerio.load(xml, {
-    			xmlMode:true
-    		});
-        rank = $('REACH').attr('RANK');
-  			e.ltime = $('SPEED').attr('TEXT');
-  			e.ptime = $('SPEED').attr('PCT');
-    		if(rank) e.arank = rank;
-    		else if(typeof rank === 'undefined') {
-    			console.log ('Rank for '+aurl+ ' not available.');
-    		} */
-      } else console.log('Error fetching alexa data for ' + link);
-    });
-  } else console.log('Alexa Data already present for ' + link);
 }

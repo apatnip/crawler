@@ -7,7 +7,7 @@ exports.init = function(configs, isLive) {
   live = isLive == true;
 }
 
-exports.append = function addgpsi(e, strategy) {
+exports.append = function (e, strategy) {
   var url = e.url;
   getgpsi(url, strategy, function(data) {
     if (data) {
