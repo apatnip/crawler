@@ -1,4 +1,5 @@
 import sys
+import os
 import json
 import cv2
 import numpy as np
@@ -12,6 +13,7 @@ cordinates = sys.argv[1];
 image = sys.argv[2];
 img = cv2.imread(image)
 heightPage, widthPage  = img.shape[:2]
+overlay = img.copy()
 
 # Checks if a link is inside a box
 def containsLink (x,y,link):
@@ -48,23 +50,23 @@ def getLinkDensity():
 				break
 			cv2.rectangle(img,(x,y),(x+boxSize,y+boxSize),(80,100,20),2)
 			counter=0
-			for link in data:
+			for link in data['aTags']:
 				link = json.loads(link)	
 				if containsLink(x,y,link):
 					counter+=1
-		#	print counter
 			cv2.putText(img,str(counter),(x+boxSize/2,y+boxSize), font, 4,(0,0,0),2, cv2.FONT_HERSHEY_PLAIN)
 			x += moveSize
 		y += moveSize
 
-# Read coordinates from file
+
+left = widthPage
+right = 0
 with open(cordinates) as data_file:    
     data = json.load(data_file)
 
-# Plot links in image and find margins
-left = widthPage
-right = 0
-for link in data:
+os.remove(coordinates)
+
+for link in data['aTags']:
 	link = json.loads(link)	
 	yLink = int(link['top'])
 	xLink = int(link['left'])
@@ -74,13 +76,16 @@ for link in data:
 	width = int(link['width'])
 	if (xLink+width) >right:
 		right = xLink+width 
-	cv2.rectangle(img,(xLink,yLink),(xLink+width,yLink+height),(40,50,200),2)
+	cv2.rectangle(img,(xLink,yLink),(xLink+width,yLink+height),(0,0,255),-1)
+	cv2.rectangle(img,(xLink,yLink),(xLink+width,yLink+height),(0,0,0),2)
+opacity = 0.3
+cv2.addWeighted(overlay, opacity, img, 1 - opacity, 0, img)
 
 # Draw margins
 cv2.line(img,(left,0),(left,heightPage),(255,0,0),5)
 cv2.line(img,(right,0),(right,heightPage),(255,0,0),5)
 
-# Find number of links in boxes
+#Find number of links in boxes
 getLinkDensity()
 
 # Save image
