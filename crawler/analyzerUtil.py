@@ -64,7 +64,7 @@ right = 0
 with open(cordinates) as data_file:    
     data = json.load(data_file)
 
-os.remove(coordinates)
+os.remove(cordinates)
 
 for link in data['aTags']:
 	link = json.loads(link)	
