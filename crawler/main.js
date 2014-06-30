@@ -123,12 +123,6 @@ exports.liveServer = function(url, res) {
     console.log('Crashed: '.red + crash.url);
     res.end(url + ' sucks :-P ' + 'It crashed!!\n');
   });
-  /*
-  if (jsMode) findRes(e, emitter);
-  if (psidMode) psi.append(e, 'desktop');
-  if (psimMode) psi.append(e, 'mobile');
-  if (alexaMode) alexa.append(e);
-*/
   request.emitter.on('done', function() {
     processing.splice(processing.indexOf(request), 1);
     printpool();
@@ -341,7 +335,7 @@ function findRes(e, emitter) {
                 format: 'jpeg',
                 quality: '60'
               }, function() {
-                fs.writeFile(host, JSON.stringify(object), analyzer.afterWrite(e, host));
+                fs.writeFile('./'+host, JSON.stringify(object), analyzer.afterWrite(e, host));
               });
               e.capture = path;
             }

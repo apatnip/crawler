@@ -3,16 +3,18 @@ import os
 import json
 import cv2
 import numpy as np
-from matplotlib import pyplot as plt
 from pprint import pprint
+from matplotlib import pyplot as plt
 
 font = cv2.FONT_HERSHEY_SIMPLEX
-boxSize = 300
-moveSize = 300
+boxSize = 200
+moveSize = 5
 cordinates = sys.argv[1];
 image = sys.argv[2];
 img = cv2.imread(image)
 heightPage, widthPage  = img.shape[:2]
+imageQuality = 56
+
 overlay = img.copy()
 
 # Checks if a link is inside a box
@@ -21,6 +23,9 @@ def containsLink (x,y,link):
 	xLink = int(link['left'])
 	height = int(link['height'])
 	width = int(link['width'])
+	if containsPoint(x,y,xLink+ width/2,yLink+height/2):
+		return True
+	'''
 	if containsPoint(x,y,xLink,yLink):
 		return True
 	if containsPoint(x,y,xLink+width,yLink):
@@ -29,17 +34,21 @@ def containsLink (x,y,link):
 		return True
 	if containsPoint(x,y,xLink+width,yLink+height):
 		return True
+		'''
 	return False
 
 # Checks if a point is inside a box
 def containsPoint (x,y,xp,yp):
-	if xp>x and xp<x+boxSize:
-		if yp>y and yp<y+boxSize:
+	if xp>=x and xp<=x+boxSize:
+		if yp>=y and yp<=y+boxSize:
 			return True
 	return False
-
-# Draw grid and find no of links in each grid
-def getLinkDensity():
+ 
+# claculate max density
+def getMax():
+	maxl = 0
+	maxx = 0
+	maxy = 0
 	y=0
 	while True:	
 		x=left
@@ -48,24 +57,53 @@ def getLinkDensity():
 		while True:	
 			if x+boxSize>widthPage:
 				break
-			cv2.rectangle(img,(x,y),(x+boxSize,y+boxSize),(80,100,20),2)
 			counter=0
 			for link in data['aTags']:
 				link = json.loads(link)	
 				if containsLink(x,y,link):
 					counter+=1
-			cv2.putText(img,str(counter),(x+boxSize/2,y+boxSize), font, 4,(0,0,0),2, cv2.FONT_HERSHEY_PLAIN)
+			if counter>maxl:
+				maxl = counter
+			x += moveSize
+		y += moveSize
+	return float(maxl)
+
+# Draw grid and find no of links in each box
+def getLinkDensity():
+	y= -boxSize/2
+	halfmax = getMax()/2
+	while True:	
+		x=0
+		if y+boxSize>heightPage:
+			break
+		while True:	
+			counter=0
+			for link in data['aTags']:
+				link = json.loads(link)	
+				if containsLink(x,y,link):
+					counter+=1
+			# Heatmap
+			r = int(max(0, (255*(counter/halfmax - 1))))
+			b = int(max(0, (255*(1 - counter/halfmax))))
+			g = 255-b-r
+		#	cv2.putText(overlay,str(counter),(x+boxSize/3,y+boxSize/2), font, 2,(b,g,r),3, cv2.FONT_HERSHEY_PLAIN)
+			if counter>=halfmax/2:
+				cv2.rectangle(img,(x+boxSize/2 - moveSize/2,y+boxSize/3 -moveSize/2),(x+boxSize/2 +moveSize/2,y+boxSize/2 + moveSize/2),(b,g,r),-1)
+			if x+boxSize>widthPage:
+				break
 			x += moveSize
 		y += moveSize
 
-
-left = widthPage
-right = 0
+# Read coordinates from file
 with open(cordinates) as data_file:    
     data = json.load(data_file)
 
-os.remove(cordinates)
+# Remove coordinates file
+#os.remove(cordinates)
 
+# Plot links in image and find margins
+left = widthPage
+right = 0
 for link in data['aTags']:
 	link = json.loads(link)	
 	yLink = int(link['top'])
@@ -76,21 +114,23 @@ for link in data['aTags']:
 	width = int(link['width'])
 	if (xLink+width) >right:
 		right = xLink+width 
-	cv2.rectangle(img,(xLink,yLink),(xLink+width,yLink+height),(0,0,255),-1)
-	cv2.rectangle(img,(xLink,yLink),(xLink+width,yLink+height),(0,0,0),2)
-opacity = 0.3
-cv2.addWeighted(overlay, opacity, img, 1 - opacity, 0, img)
+	cv2.rectangle(img,(xLink,yLink),(xLink+width,yLink+height),(50,50,50),2)
 
 # Draw margins
 cv2.line(img,(left,0),(left,heightPage),(255,0,0),5)
 cv2.line(img,(right,0),(right,heightPage),(255,0,0),5)
 
-#Find number of links in boxes
+# Find number of links in boxes
 getLinkDensity()
+
+#blur = cv2.blur(img,(50,50))
+
+opacity = 0.2
+cv2.addWeighted(overlay, opacity, img, 1 - opacity, 0, img)
 
 # Save image
 saveImage = image+'-analyzed.jpg'
-cv2.imwrite(saveImage,img)
+cv2.imwrite(saveImage,img,[int(cv2.IMWRITE_JPEG_QUALITY),imageQuality])
 
 # Show image
 cv2.imshow('image',img)
