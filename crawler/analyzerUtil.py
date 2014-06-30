@@ -36,7 +36,7 @@ def contrastCal ():
 	fontFace = cv2.FONT_HERSHEY_SCRIPT_SIMPLEX;
 	fontScale = 1;
 	thickness = 3;
-	for link in data['aTags']:
+	for link in data['aTags'] + data['buttons']:
 		link = json.loads(link)
 		y = int(link['top'])
 		x = int(link['left'])

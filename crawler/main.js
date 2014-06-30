@@ -306,8 +306,24 @@ function findRes(e, emitter) {
           page.evaluate(function() {
             var object = {
               aTags: [],
+              buttons: [],
               doc: []
             };
+            $("button").each(function() {
+              var button = $(this);
+              var rect = button[0].getBoundingClientRect();
+              var max = rect.height * rect.width;
+              button.children().each(function() {
+                var newRect = $(this)[0].getBoundingClientRect();
+                var newMax = newRect.width * newRect.height;
+                if (max < newMax) {
+                  max = newMax;
+                  rect = newRect;
+                }
+              });
+              if (rect.height != 0 && rect.width != 0)
+                object.buttons.push(JSON.stringify(rect));
+            });
             $("a").each(function() {
               var aTag = $(this);
               var rect = aTag[0].getBoundingClientRect();
@@ -335,7 +351,7 @@ function findRes(e, emitter) {
                 format: 'jpeg',
                 quality: '60'
               }, function() {
-                fs.writeFile('./'+host, JSON.stringify(object), analyzer.afterWrite(e, host));
+                fs.writeFile('./' + host, JSON.stringify(object), analyzer.afterWrite(e, host));
               });
               e.capture = path;
             }
