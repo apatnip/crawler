@@ -5,10 +5,12 @@ import cv2
 import numpy as np
 from pprint import pprint
 from matplotlib import pyplot as plt
+from pprint import pprint
+from sklearn.cluster import KMeans
 
 font = cv2.FONT_HERSHEY_SIMPLEX
-boxSize = 200
-moveSize = 5
+boxSize = 100
+moveSize = 20
 cordinates = sys.argv[1];
 image = sys.argv[2];
 img = cv2.imread(image)
@@ -16,6 +18,51 @@ heightPage, widthPage  = img.shape[:2]
 imageQuality = 56
 
 overlay = img.copy()
+
+def relativeLum(color):
+	sRed = float(color[0]/255)
+	sGreen = float(color[1]/255)
+	sBlue = float(color[2]/255)
+	R = [sRed/12.92 , ((sRed+0.055)/1.055) ** 2.4] [sRed > 0.03928] 
+	G = [sGreen/12.92 , ((sGreen+0.055)/1.055) ** 2.4][sGreen > 0.03928] 
+	B = [sBlue/12.92 , ((sBlue+0.055)/1.055) ** 2.4][sBlue > 0.03928] 
+	L = 0.2126 * R + 0.7152 * G + 0.0722 * B
+	return L
+
+#can be merged in similar loop of for link in data['aTags']
+def contrastCal ():
+	imagE = img.copy()
+	mask = imagE
+	fontFace = cv2.FONT_HERSHEY_SCRIPT_SIMPLEX;
+	fontScale = 1;
+	thickness = 3;
+	for link in data['aTags']:
+		link = json.loads(link)
+		y = int(link['top'])
+		x = int(link['left'])
+		height = int(link['height'])
+		width = int(link['width'])
+		crop_img = imagE[y:y+height, x:x+width]
+		if crop_img.size > 0:
+			crop_img = cv2.cvtColor(crop_img, cv2.COLOR_BGR2RGB)
+			# reshape the crop_img to be a list of pixels
+			crop_img = crop_img.reshape((crop_img.shape[0] * crop_img.shape[1], 3))
+			# cluster the pixel intensities
+			clt = KMeans(n_clusters = 2)
+			clt.fit(crop_img)
+			rL_back = relativeLum(clt.cluster_centers_[0])
+			rL_text = relativeLum(clt.cluster_centers_[1])
+			contrast = rL_back/rL_text
+			contrast = [contrast , 1/contrast][contrast < 1]
+			text = str(round(contrast,1))
+			cv2.putText(mask, text, (x+width/4,y+height/4),font, fontScale,(0,0,0),thickness, 8)
+			cv2.addWeighted(mask, 0.8, imagE, 1 - 0.8, 0, imagE)
+
+	# Save image
+	saveImage = image+'-contrast.jpg'
+	cv2.imwrite(saveImage,imagE,[int(cv2.IMWRITE_JPEG_QUALITY),imageQuality])
+	cv2.imshow('Contrast',imagE)
+	cv2.waitKey(0)
 
 # Checks if a link is inside a box
 def containsLink (x,y,link):
@@ -87,8 +134,8 @@ def getLinkDensity():
 			b = int(max(0, (255*(1 - counter/halfmax))))
 			g = 255-b-r
 		#	cv2.putText(overlay,str(counter),(x+boxSize/3,y+boxSize/2), font, 2,(b,g,r),3, cv2.FONT_HERSHEY_PLAIN)
-			if counter>=halfmax/2:
-				cv2.rectangle(img,(x+boxSize/2 - moveSize/2,y+boxSize/3 -moveSize/2),(x+boxSize/2 +moveSize/2,y+boxSize/2 + moveSize/2),(b,g,r),-1)
+			if counter>=halfmax/3:
+				cv2.rectangle(img,(x+boxSize/2 - moveSize/2,y+boxSize/2 -moveSize/2),(x+boxSize/2 +moveSize/2,y+boxSize/2 + moveSize/2),(b,g,r),-1)
 			if x+boxSize>widthPage:
 				break
 			x += moveSize
@@ -100,6 +147,8 @@ with open(cordinates) as data_file:
 
 # Remove coordinates file
 #os.remove(cordinates)
+
+contrastCal()
 
 # Plot links in image and find margins
 left = widthPage
