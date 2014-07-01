@@ -61,8 +61,6 @@ def contrastCal ():
 	# Save image
 	saveImage = image+'-contrast.jpg'
 	cv2.imwrite(saveImage,imagE,[int(cv2.IMWRITE_JPEG_QUALITY),imageQuality])
-	cv2.imshow('Contrast',imagE)
-	cv2.waitKey(0)
 
 # Checks if a link is inside a box
 def containsLink (x,y,link):
@@ -180,8 +178,3 @@ cv2.addWeighted(overlay, opacity, img, 1 - opacity, 0, img)
 # Save image
 saveImage = image+'-analyzed.jpg'
 cv2.imwrite(saveImage,img,[int(cv2.IMWRITE_JPEG_QUALITY),imageQuality])
-
-# Show image
-cv2.imshow('image',img)
-cv2.waitKey(0)
-cv2.destroyAllWindows()

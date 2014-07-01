@@ -12,7 +12,12 @@ var url = require('url')
 var psi = require('./psi');
 var analyzer = require('./analyzer');
 var alexa = require('./alexa');
+// Connect to db
+var db = require('./model/db');
 // Default values of variables
+
+var pool = [];
+var processing = [];
 
 //GET parameters
 var qfindurls = false; // Whether add urls from www ranking
@@ -29,15 +34,28 @@ var pageSize = 1000; // Get data from wwwranking in slots of?
 var pageNo = 10; // No of slots
 
 var loadImage = true;
+var colName = 'thoupages'; // Collection name
+var addwCheck = true; // Add to db with check if already exists
+var qprint = false; // whether print database
+
+// automated config
+var query = {};
+var noofpages = 4; // 0 for execution on all the results of the query
+var slots = 2;
+var executeInterval = 5000; // Time to wait for next slot to execute
+
+// Queue config
+var concurrentProcessing = 2; // Number of processes in Queue at any time
 var live = true;
-var configs;
+var configs, Data;
+
 exports.init = function(file, isLive) {
   // Get config file
   configs = require(file);
-
+  live = isLive == true;
   // Call init for other files
-  psi.init(configs, isLive);
-
+  psi.init(configs, live);
+  alexa.init(live);
   // Set parameter values
   key = configs.googleAPI;
   qfindurls = configs.getNewUrls;
@@ -49,25 +67,17 @@ exports.init = function(file, isLive) {
   pageSize = configs.slots_NoOfUrlsToFetch;
   pageNo = configs.noOfSlots;
   loadImage = configs.screenShots;
-  live = isLive == true;
+  colName = configs.collection;
+  addwCheck = configs.checkIfExistsInDB;
+  qprint = configs.printDB;
+  query = configs.queryToDB;
+  noofpages = configs.noOfURLsToFetch;
+  slots = configs.slotsOfFetching;
+  executeInterval = configs.executeInterval;
+  concurrentProcessing = configs.noOfConcurrentProcess;
+  db.init(configs.dbServer, configs.dbPort, live);
+  Data = mongoose.model(colName);
 }
-
-// Configs yet to be written
-var colName = 'thoupages'; // Collection name
-var addwCheck = true; // Add to db with check if already exists
-var qprint = false; // whether print database
-
-// automated config
-var query = {};
-var noofpages = 4; // 0 for execution on all the results of the query
-var slots = 2;
-var executeInterval = 5000;
-
-// Queue config
-var concurrentProcessing = 2;
-
-var pool = [];
-var processing = [];
 
 pool.push = function(request) {
   e = request.obj;
@@ -139,10 +149,6 @@ exports.liveServer = function(url, res) {
     */
   });
 };
-
-// Connect to db
-db = require('./model/db'),
-Data = mongoose.model(colName);
 
 exports.automate = function() {
   var con = mongoose.connection;
@@ -294,9 +300,7 @@ function findRes(e, emitter) {
         console.log('Error code: ' + resourceError.errorCode + '. Description: ' + resourceError.errorString);
       });
       page.set('onNavigationRequested', function(url, type, willNavigate, main) {
-        //  if(main) console.log('Trying to navigate to: ' + url);
-        //  console.log('Caused by: ' + type);
-        // 	console.log('Will actually navigate: ' + willNavigate);
+        // Possible Future implementation :P
       });
       page.open(pageurl, function(status) {
         if (status !== 'success') {

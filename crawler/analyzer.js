@@ -1,7 +1,7 @@
  var spawn = require('child_process').spawn;
 
  exports.afterWrite = function(e, host) {
-  console.log('Calculating link density')
+   console.log('Calculating link density')
    var pyChild = spawn('python', ['analyzerUtil.py', host, e.capture], {
      stdio: [null, null, null, 'ipc']
    });
@@ -12,5 +12,4 @@
      console.log('Received message...');
      console.log(message);
    });
-   //ph.exit();
  }

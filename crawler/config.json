@@ -3,7 +3,7 @@
   "googleAPI": "AIzaSyDP18DJHojJMOyVdjjtcZDVfxVDCHfXpj4",
   "APIurl": "http://www.connecto.io",
 
-  "dbServer": "localhost",
+  "dbServer": "192.168.100.73",
   "dbPort": 27017,
 
   "getAlexa": false,
@@ -12,7 +12,9 @@
   "pageInsightD": false,
   "pageInsightM": false,
 
-  "takeScrShot": true,
+  "screenShots": true,
+  "takeScrShotDesktop": true,
+  "takeScrShotMobile": false,
   "desktopScreen": {
     "width": 1366,
     "height": 768
@@ -22,9 +24,16 @@
     "height": 480
   },
   "scrShotRenderDelay": 2500,
-  "screenShots": true,
   "bgWhite": true,
   "resourceTimeOut": 60000,
   "slots_NoOfUrlsToFetch": 1,
-  "noOfSlots": 10
+  "noOfSlots": 10,
+  "collection": "thoupages",
+  "checkIfExistsInDB": true,
+  "printDB": false,
+  "queryToDB": "",
+  "noOfURLsToFetch": 5,
+  "slotsOfFetching": 2,
+  "executeInterval": 5000,
+  "concurrentProcessing": 5
 }
