@@ -1,5 +1,10 @@
 var request = require('request');
 var parseString = require('xml2js').parseString;
+var live;
+
+exports.init = function(configs, isLive) {
+  live = isLive == true;
+}
 
 var adone = 0;
 exports.append = function(e) {
@@ -13,7 +18,6 @@ exports.append = function(e) {
         parseString(xml, function(err, result) {
           e.alexa = result.ALEXA;
           e.markModified('alexa');
-          /*
           if (!live) {
             e.save(function(err) {
               if (err) return console.error(err);
@@ -21,19 +25,7 @@ exports.append = function(e) {
               console.log('Alexa Done '.green + adone);
             })
           }
-          */
         });
-        /*
-        var $ = cheerio.load(xml, {
-    			xmlMode:true
-    		});
-        rank = $('REACH').attr('RANK');
-  			e.ltime = $('SPEED').attr('TEXT');
-  			e.ptime = $('SPEED').attr('PCT');
-    		if(rank) e.arank = rank;
-    		else if(typeof rank === 'undefined') {
-    			console.log ('Rank for '+aurl+ ' not available.');
-    		} */
       } else console.log('Error fetching alexa data for ' + link);
     });
   } else console.log('Alexa Data already present for ' + link);

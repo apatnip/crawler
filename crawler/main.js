@@ -22,9 +22,10 @@ var alexaMode = true; // Whether get alexa data
 var jsMode = true; // get resources (js)
 var psidMode = true; // get PageSpeed insights for desktop
 var psimMode = true; // get PageSpeed Insights for mobile
+var linkAnalysis = false;
 
 //config
-var resTimeout = 60000; // Resource timeout
+var resTimeout = 120000; // Resource timeout
 var pageSize = 1000; // Get data from wwwranking in slots of?
 var pageNo = 10; // No of slots
 
@@ -37,6 +38,7 @@ exports.init = function(file, isLive) {
 
   // Call init for other files
   psi.init(configs, isLive);
+  alexa.init(configs, isLive);
 
   // Set parameter values
   key = configs.googleAPI;
@@ -59,12 +61,12 @@ var qprint = false; // whether print database
 
 // automated config
 var query = {};
-var noofpages = 4; // 0 for execution on all the results of the query
-var slots = 2;
+var noofpages = 100; // 0 for execution on all the results of the query
+var slots = 5;
 var executeInterval = 5000;
 
 // Queue config
-var concurrentProcessing = 2;
+var concurrentProcessing = 5;
 
 var pool = [];
 var processing = [];
@@ -153,10 +155,33 @@ exports.automate = function() {
 
     if (qprint) printData(Data);
     if (qfindurls) findUrl();
-    if (!live) execute();
+    if (!live) executeThrottled();
 
     /****************************************/
 
+  });
+}
+
+function executeThrottled() {
+  donecount = 0;
+  Data.find(query, function(err, arr) {
+    arr.forEach(function(element, index, array) {
+      if(index<noofpages) {
+        var request = {};
+        request.obj = element;
+        request.emitter = new events.EventEmitter();
+        pool.push(request);
+        request.emitter.on('done', function() {
+          e.save(function(err) {
+            if (err) return console.error(err);
+            donecount++;
+            console.info('Done '.green + donecount);
+          })
+          processing.splice(processing.indexOf(request), 1);
+          if (pool.length > 0) processing.push((pool.splice(0, 1))[0]);
+        });
+      }
+    })
   });
 }
 
@@ -190,21 +215,18 @@ String.prototype.endsWith = function(suffix) {
 String.prototype.contains = function(it) {
   return this.indexOf(it) != -1;
 };
-
 function testjs(url, type) {
   if (url.endsWith('.js')) return true;
   else if (url.contains('.js?')) return true;
   else if (type != null && type.contains('javascript')) return true;
   return false;
 }
-
 function testcss(url, type) {
   if (url.endsWith('.css')) return true;
   else if (url.contains('.css?')) return true;
   else if (type != null && type.contains('css')) return true;
   return false;
 }
-
 function testextjs(url, host) {
   if (url.contains(host)) return false;
   else return true;
@@ -213,15 +235,13 @@ var gethost = function(href) {
   urlo = url.parse(href);
   return urlo.host;
 }
+function testimg(url, type) {
+  if (url.endsWith('.jpg')) return true;
+  if (url.endsWith('.png')) return true;
+  if (url.endsWith('.gif')) return true;
+  return false;
+}
 
-  function testimg(url, type) {
-    if (url.endsWith('.jpg')) return true;
-    if (url.endsWith('.png')) return true;
-    if (url.endsWith('.gif')) return true;
-    return false;
-  }
-
-donecount = 0;
 
 function findRes(e, emitter) {
   var pageurl = e.url;
@@ -234,11 +254,7 @@ function findRes(e, emitter) {
       e.save(function(err) {});
     }
   });
-  if (loadImage == false) {
-    arg = '--load-images=no';
-  } else arg = '';
-
-  phantom.create(arg, function(ph) {
+  phantom.create(function(ph) {
     ph.onError = function(msg, trace) {
       var msgStack = ['PHANTOM ERROR: ' + msg];
       if (trace && trace.length) {
@@ -304,52 +320,56 @@ function findRes(e, emitter) {
         }
         page.includeJs("http://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js", function() {
           page.evaluate(function() {
-            var object = {
-              aTags: [],
-              doc: []
-            };
-            $("a").each(function() {
-              var aTag = $(this);
-              var rect = aTag[0].getBoundingClientRect();
-              var max = rect.height * rect.width;
-              aTag.children().each(function() {
-                var newRect = $(this)[0].getBoundingClientRect();
-                var newMax = newRect.width * newRect.height;
-                if (max < newMax) {
-                  max = newMax;
-                  rect = newRect;
-                }
+           // if(linkAnalysis) {
+              var object = {
+                aTags: [],
+                doc: []
+              };
+              $("a:visible").each(function() {
+                var aTag = $(this);
+                if(! $(this).visible) console.log('get it')
+                var rect = aTag[0].getBoundingClientRect();
+                var max = rect.height * rect.width;
+                aTag.children().each(function() {
+                  var newRect = $(this)[0].getBoundingClientRect();
+                  var newMax = newRect.width * newRect.height;
+                  if (max < newMax) {
+                    max = newMax;
+                    rect = newRect;
+                  }
+                });
+                if (rect.height != 0 && rect.width != 0)
+                  object.aTags.push(JSON.stringify(rect));
               });
-              if (rect.height != 0 && rect.width != 0)
-                object.aTags.push(JSON.stringify(rect));
-            });
-            object.doc.push(document);
-            return object;
+              object.doc.push(document);
+              return object;  
+            //}
+           // else return document;
           }, function(object) {
             //now actually done
-            var doc = object.doc.pop(); // Document object
-            e.title = doc.title;
+            //if(linkAnalysis) 
+            try {
+              var doc = object.doc.pop(); // Document object
+              //else doc = object;
+              e.title = doc.title;   
+            }
+            catch (ex) {
+
+            }
             if (loadImage == true) {
               var path = 'screenshots/' + host;
               page.render('./' + path, {
                 format: 'jpeg',
                 quality: '60'
               }, function() {
-                fs.writeFile('./'+host, JSON.stringify(object), analyzer.afterWrite(e, host));
+                if (linkAnalysis) fs.writeFile('./'+host, JSON.stringify(object), analyzer.afterWrite(e, host));
               });
               e.capture = path;
             }
             e.js = extjsarr;
 
-            if (!live) {
-              e.save(function(err) {
-                if (err) return console.error(err);
-                donecount++;
-                console.info('Done '.green + donecount);
-              });
-            } else {
-              emitter.emit('done');
-            }
+
+            emitter.emit('done');
             console.log(e);
             page.close();
             ph.exit();
@@ -382,12 +402,10 @@ function findUrl() {
       } else console.log("error");
       j++;
     });
-
     if (j == (pageNo - 1)) { //
       clearInterval(timer);
       console.log('Fetching URLs is over.');
     }
-
   }, 10000)
 }
 
@@ -447,42 +465,4 @@ function addUrls(url) {
       }
     })
   }
-}
-
-// Refactor alexa ranks
-var adone = 0;
-
-function addData(e) {
-  link = e.url;
-  if (e.alexa == null) {
-    console.log('Fetching alexa data for -> ' + e.url);
-    var aurl = 'http://data.alexa.com/data?cli=10&dat=snbamz&url=' + link;
-    var rank;
-    request(aurl, function(error, response, xml) {
-      if (!error && response.statusCode == 200) {
-        parseString(xml, function(err, result) {
-          e.alexa = result.ALEXA;
-          e.markModified('alexa');
-          if (!live) {
-            e.save(function(err) {
-              if (err) return console.error(err);
-              adone++;
-              console.log('Alexa Done '.green + adone);
-            })
-          }
-        });
-        /*
-        var $ = cheerio.load(xml, {
-    			xmlMode:true
-    		});
-        rank = $('REACH').attr('RANK');
-  			e.ltime = $('SPEED').attr('TEXT');
-  			e.ptime = $('SPEED').attr('PCT');
-    		if(rank) e.arank = rank;
-    		else if(typeof rank === 'undefined') {
-    			console.log ('Rank for '+aurl+ ' not available.');
-    		} */
-      } else console.log('Error fetching alexa data for ' + link);
-    });
-  } else console.log('Alexa Data already present for ' + link);
 }
