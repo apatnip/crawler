@@ -1,16 +1,22 @@
-// Bring Mongoose into the app
-var mongoose = require('mongoose');
+// Get parameters
+var host = 'deshaw.local';
+var db = 'crawler';
+var port = '27017';
+var live;
 
-// GET parameter
 // Build the connection string
-// Mongoose Connect Parameter
-//var dbURI = 'mongodb://localhost/test';
-//var dbURI = 'mongodb://192.168.100.211/crawler';
-var dbURI = 'mongodb://deshaw.local/crawler';
+var dbURI = 'mongodb://'+host+':'+port+'/'+db;
 //'mongodb://username:password@host:port/database?options...'
 
-// Create the database connection
-mongoose.connect(dbURI);
+exports.init = function(configs, isLive) {
+	live = isLive == true;
+
+	// Create the database connection
+	if (!live) mongoose.connect(dbURI);
+}
+
+// Bring Mongoose into the app
+var mongoose = require('mongoose');
 
 // CONNECTION EVENTS
 // When successfully connected
@@ -35,7 +41,6 @@ process.on('SIGINT', function() {
     process.exit(0);
   });
 });
-
 
 // BRING IN THE SCHEMAS & MODELS
 require('./data');

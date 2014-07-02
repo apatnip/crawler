@@ -6,9 +6,9 @@
   "dbServer": "localhost",
   "dbPort": 27017,
 
-  "getAlexa": false,
+  "getAlexa": true,
   "getNewUrls": false,
-  "getJs": true,
+  "getJs": false,
   "pageInsightD": false,
   "pageInsightM": false,
 

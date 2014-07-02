@@ -6,8 +6,11 @@ exports.init = function(configs, isLive) {
   live = isLive == true;
 }
 
-var adone = 0;
-exports.append = function(e) {
+if (!live) var adone = 0;
+
+exports.append = function(process) {
+  e = process.obj;
+  emitter = process.emitter;
   link = e.url;
   if (e.alexa == null) {
     console.log('Fetching alexa data for -> ' + e.url);
@@ -25,6 +28,8 @@ exports.append = function(e) {
               console.log('Alexa Done '.green + adone);
             })
           }
+          process.done.alexa = true;
+          emitter.emit('done');
         });
       } else console.log('Error fetching alexa data for ' + link);
     });

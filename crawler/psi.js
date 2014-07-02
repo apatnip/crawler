@@ -7,18 +7,20 @@ exports.init = function(configs, isLive) {
   live = isLive == true;
 }
 
-exports.append = function (e, strategy) {
+exports.append = function (e, strategy,emitter,done) {
   var url = e.url;
   getgpsi(url, strategy, function(data) {
     if (data) {
       var json = JSON.parse(data);
-      if (strategy == 'desktop') e.psid = json;
-      else if (strategy == 'mobile') e.psim = json;
+      if (strategy == 'desktop') e.psi.desktop = json;
+      else if (strategy == 'mobile') e.psi.mobile = json;
       if (!live) {
-        if (strategy == 'desktop') e.markModified('psid');
-        else if (strategy == 'mobile') e.markModified('psim');
+        if (strategy == 'desktop') e.psi.markModified('desktop');
+        else if (strategy == 'mobile') e.psi.markModified('mobile');
         e.save();
       }
+      done = true;
+      emitter.emit('done');
     } else console.log("error");
   });
 }

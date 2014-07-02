@@ -9,12 +9,16 @@ var dataSchema = new mongoose.Schema({
 	ltime: Number,
 	ptime: Number,
     js: [String],
-	capture: String,
-	mcapture: String,
+	capture: {
+		desktop:String,
+		mobile:String
+	},
 	title: String,
 	crash: Boolean,
-	psid: mongoose.Schema.Types.Mixed,
-	psim: mongoose.Schema.Types.Mixed,
+	psi: {
+		desktop: mongoose.Schema.Types.Mixed,
+		mobile: mongoose.Schema.Types.Mixed,
+	},
 	timeStamp: Date,
 	html: String,
 	alexa: mongoose.Schema.Types.Mixed
