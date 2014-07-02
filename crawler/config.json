@@ -6,16 +6,16 @@
   "dbServer": "192.168.100.73",
   "dbPort": 27017,
 
-  "getAlexa": true,
+  "getAlexa": false,
   "getNewUrls": false,
-  "getJs": false,
+  "getJs": true,
   "pageInsightD": false,
   "pageInsightM": false,
 
   "screenShots": true,
   "takeScrShotDesktop": true,
   "takeScrShotMobile": true,
-
+  "imageAnalysis": false,
   "desktopScreen": {
     "width": 1366,
     "height": 768
@@ -33,7 +33,6 @@
   "checkIfExistsInDB": true,
   "printDB": false,
   "queryToDB": "",
-  "imageAnalysis": false,
   "noOfURLsToFetch": 5,
   "slotsOfFetching": 2,
   "executeInterval": 5000,

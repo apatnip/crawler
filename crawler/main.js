@@ -110,7 +110,12 @@ pool.push = function(request) {
 }
 
 processing.push = function(process) {
-  var done = process.done = {alexa:false, js:false, psim:false, psid:false};
+  var done = process.done = {
+    alexa: false,
+    js: false,
+    psim: false,
+    psid: false
+  };
   e = process.obj;
   console.log('%s is now processing'.yellow, e.url);
   emitter = process.emitter;
@@ -126,11 +131,11 @@ processing.push = function(process) {
 function printpool() {
   console.log('Pool contains: ');
   for (i = 0; i < pool.length; i++) {
-    console.log('( %d ) %s', i+1, pool[i].obj.url);
+    console.log('( %d ) %s', i + 1, pool[i].obj.url);
   }
   console.log('Now processing: ');
   for (i = 0; i < processing.length; i++) {
-    console.log('( %d ) %s', i+1, processing[i].obj.url);
+    console.log('( %d ) %s', i + 1, processing[i].obj.url);
   }
 }
 
@@ -168,6 +173,7 @@ exports.liveServer = function(url, res) {
     */
   });
 };
+
 function checkdone(done) {
   console.log(done);
   if (done.alexa == alexaMode && done.js == jsMode && done.psid == psidMode && done.psim == psimMode) return true;
@@ -183,7 +189,7 @@ exports.automate = function() {
 
     if (qprint) printData(Data);
     if (qfindurls) findUrl();
-    if (!live) execute();
+    if (!live) executeThrottled();
 
     /****************************************/
 
@@ -191,17 +197,17 @@ exports.automate = function() {
 }
 
 function executeThrottled() {
-  console.log('Max number of concurrent process = '+concurrentProcessing);
+  console.log('Max number of concurrent process = ' + concurrentProcessing);
   donecount = 0;
   Data.find(query, function(err, arr) {
     arr.forEach(function(element, index, array) {
-      if(index<noofpages || noofpages==0) {
+      if (index < noofpages || noofpages == 0) {
         var request = {};
         request.obj = element;
         request.emitter = new events.EventEmitter();
         pool.push(request);
         request.emitter.on('done', function() {
-          if(checkdone(request.done)) {
+          if (checkdone(request.done)) {
             e.save(function(err) {
               if (err) return console.error(err);
               console.log(e);
@@ -281,8 +287,8 @@ var gethost = function(href) {
 
   function findRes(process) {
     var pageurl = e.url;
-	e = process.obj;
-  emitter = process.emitter;
+    e = process.obj;
+    emitter = process.emitter;
     var crash = phantom.crash(pageurl);
     crash.once('error', function() {
       e.crash = true;
@@ -355,8 +361,10 @@ var gethost = function(href) {
                   format: 'jpeg',
                   quality: '60'
                 }, function() {
-                  if (linkAnalysis)
+                  if (linkAnalysis) {
+                    console.log("Yooooooooooooooooo")
                     fs.writeFile('./' + host + '-m', JSON.stringify(object), analyzer.afterWrite(e, host + '-m'));
+                  }
                 });
               }, renderDelay);
               e.capture.mobile = path;
@@ -502,7 +510,7 @@ var gethost = function(href) {
                 e.capture.desktop = path;
               }
               e.js = extjsarr;
-				process.js.done = true;
+              process.done.js = true;
               emitter.emit('done');
               console.log(e);
               setTimeout(function() {
