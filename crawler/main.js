@@ -27,13 +27,24 @@ var alexaMode = true; // Whether get alexa data
 var jsMode = true; // get resources (js)
 var psidMode = true; // get PageSpeed insights for desktop
 var psimMode = true; // get PageSpeed Insights for mobile
+var linkAnalysis = false;
 
 //config
-var resTimeout = 60000; // Resource timeout
+var resTimeout = 120000; // Resource timeout
 var pageSize = 1000; // Get data from wwwranking in slots of?
 var pageNo = 10; // No of slots
 
 var loadImage = true;
+var desktopSS = true;
+var mobileSS = true;
+var desktopScreen = {
+  "width": 1366,
+  "height": 768
+}
+var mobileScreen = {
+  "width": 320,
+  "height": 480
+}
 var colName = 'thoupages'; // Collection name
 var addwCheck = true; // Add to db with check if already exists
 var qprint = false; // whether print database
@@ -43,7 +54,7 @@ var query = {};
 var noofpages = 4; // 0 for execution on all the results of the query
 var slots = 2;
 var executeInterval = 5000; // Time to wait for next slot to execute
-
+var renderDelay = 2500;
 // Queue config
 var concurrentProcessing = 2; // Number of processes in Queue at any time
 var live = true;
@@ -67,6 +78,10 @@ exports.init = function(file, isLive) {
   pageSize = configs.slots_NoOfUrlsToFetch;
   pageNo = configs.noOfSlots;
   loadImage = configs.screenShots;
+  desktopSS = configs.takeScrShotDesktop;
+  mobileSS = configs.takeScrShotMobile;
+  desktopScreen = configs.desktopScreen;
+  mobileScreen = configs.mobileScreen;
   colName = configs.collection;
   addwCheck = configs.checkIfExistsInDB;
   qprint = configs.printDB;
@@ -75,6 +90,8 @@ exports.init = function(file, isLive) {
   slots = configs.slotsOfFetching;
   executeInterval = configs.executeInterval;
   concurrentProcessing = configs.noOfConcurrentProcess;
+  linkAnalysis = configs.imageAnalysis;
+  renderDelay = configs.scrShotRenderDelay;
   db.init(configs.dbServer, configs.dbPort, live);
   Data = mongoose.model(colName);
 }
@@ -166,6 +183,29 @@ exports.automate = function() {
   });
 }
 
+function executeThrottled() {
+  donecount = 0;
+  Data.find(query, function(err, arr) {
+    arr.forEach(function(element, index, array) {
+      if (index < noofpages) {
+        var request = {};
+        request.obj = element;
+        request.emitter = new events.EventEmitter();
+        pool.push(request);
+        request.emitter.on('done', function() {
+          e.save(function(err) {
+            if (err) return console.error(err);
+            donecount++;
+            console.info('Done '.green + donecount);
+          })
+          processing.splice(processing.indexOf(request), 1);
+          if (pool.length > 0) processing.push((pool.splice(0, 1))[0]);
+        });
+      }
+    })
+  });
+}
+
 function execute() {
   Data.find(query, function(err, arr) {
     var add = 0;
@@ -227,282 +267,325 @@ var gethost = function(href) {
     return false;
   }
 
-donecount = 0;
-
-function findRes(e, emitter) {
-  var pageurl = e.url;
-  var crash = phantom.crash(pageurl);
-  crash.once('error', function() {
-    e.crash = true;
-    console.error('Crashed: '.yellow + crash.url);
-    console.error(pageurl + ' sucks :-P It crashed!!\n');
-    if (!live) {
-      e.save(function(err) {});
-    }
-  });
-  if (loadImage == false) {
-    arg = '--load-images=no';
-  } else arg = '';
-
-  phantom.create(arg, function(ph) {
-    ph.onError = function(msg, trace) {
-      var msgStack = ['PHANTOM ERROR: ' + msg];
-      if (trace && trace.length) {
-        msgStack.push('TRACE:');
-        trace.forEach(function(t) {
-          msgStack.push(' -> ' + (t.file || t.sourceURL) + ': ' + t.line + (t.function ? ' (in function ' + t.function +')' : ''));
-        });
+  function findRes(e, emitter) {
+    var pageurl = e.url;
+    var crash = phantom.crash(pageurl);
+    crash.once('error', function() {
+      e.crash = true;
+      console.error('Crashed: '.yellow + crash.url);
+      console.error(pageurl + ' sucks :-P It crashed!!\n');
+      if (!live) {
+        e.save(function(err) {});
       }
-      console.error(msgStack.join('\n'));
-    };
-    ph.createPage(function(page) {
-      page.set('viewportSize', {
-        width: 1366,
-        height: 768
+    });
+    if (mobileSS && loadImage) {
+      phantom.create(function(ph) {
+        ph.createPage(function(page) {
+          page.set('viewportSize', {
+            width: mobileScreen.width,
+            height: mobileScreen.height
+          });
+          var host = gethost(pageurl);
+          page.set('settings.userAgent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 7_1 like Mac OS X) AppleWebKit/537.51.2 (KHTML, like Gecko) Version/7.0 Mobile/11D5145e Safari/9537.53');
+          page.set('settings.resourceTimeout', resTimeout);
+          page.open(pageurl, function(status) {
+            if (status !== 'success') {
+              console.log('Unable to load in mobile' + pageurl);
+            }
+            page.includeJs("http://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js", function() {
+              page.evaluate(function() {
+                var object = {
+                  aTags: [],
+                  buttons: [],
+                };
+                $("button").each(function() {
+                  var button = $(this);
+                  var rect = button[0].getBoundingClientRect();
+                  var max = rect.height * rect.width;
+                  button.children().each(function() {
+                    var newRect = $(this)[0].getBoundingClientRect();
+                    var newMax = newRect.width * newRect.height;
+                    if (max < newMax) {
+                      max = newMax;
+                      rect = newRect;
+                    }
+                  });
+                  if (rect.height != 0 && rect.width != 0)
+                    object.buttons.push(JSON.stringify(rect));
+                });
+                $("a").each(function() {
+                  var aTag = $(this);
+                  var rect = aTag[0].getBoundingClientRect();
+                  var max = rect.height * rect.width;
+                  aTag.children().each(function() {
+                    var newRect = $(this)[0].getBoundingClientRect();
+                    var newMax = newRect.width * newRect.height;
+                    if (max < newMax) {
+                      max = newMax;
+                      rect = newRect;
+                    }
+                  });
+                  if (rect.height != 0 && rect.width != 0)
+                    object.aTags.push(JSON.stringify(rect));
+                });
+                return object;
+              }, function(object) {
+                afterEvalM(object);
+              });
+            });
+
+            function afterEvalM(object) {
+              var path = 'screenshots/' + host + '-m';
+              setTimeout(function() {
+                page.render('./' + path, {
+                  format: 'jpeg',
+                  quality: '60'
+                }, function() {
+                  if (linkAnalysis)
+                    fs.writeFile('./' + host + '-m', JSON.stringify(object), analyzer.afterWrite(e, host + '-m'));
+                });
+              }, renderDelay);
+              e.mcapture = path;
+              setTimeout(function() {
+                page.close();
+                ph.exit();
+              }, renderDelay + 1);
+            }
+          });
+        });
       });
-      var jsarr = [];
-      var cssarr = [];
-      var extjsarr = [];
-      var host = gethost(pageurl);
-      page.set('onError', function(msg, trace) {
-        //console.log('Found error: '+msg);
-        var msgStack = ['ERROR: '.red + msg];
+    }
+    phantom.create(function(ph) {
+      ph.onError = function(msg, trace) {
+        var msgStack = ['PHANTOM ERROR: ' + msg];
         if (trace && trace.length) {
           msgStack.push('TRACE:');
           trace.forEach(function(t) {
-            msgStack.push(' -> ' + t.file + ': ' + t.line + (t.function ? ' (in function "' + t.function +'")' : ''));
+            msgStack.push(' -> ' + (t.file || t.sourceURL) + ': ' + t.line + (t.function ? ' (in function ' + t.function +')' : ''));
           });
         }
-        // uncomment to log into the console 
         console.error(msgStack.join('\n'));
-      });
-      page.set('settings.userAgent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1944.0 Safari/537.36');
-      page.set('settings.resourceTimeout', resTimeout);
-      page.set('onResourceReceived', function(response) {
-        if (response.stage == 'end') {
-          var url = response.url;
-          //		console.log(url);
-          hosturl = gethost(url);
-          type = response.contentType;
-          if (testjs(url, type)) { // resource is js
-            jsarr.push(url);
-            if (testextjs(hosturl, host)) {
-              extjsarr.push(url);
-            }
-          } else if (testcss(url, type)) { // resource is css
-            cssarr.push(url);
+      };
+      ph.createPage(function(page) {
+        page.set('viewportSize', {
+          width: desktopScreen.width,
+          height: desktopScreen.height
+        });
+        var jsarr = [];
+        var cssarr = [];
+        var extjsarr = [];
+        var host = gethost(pageurl);
+        page.set('onError', function(msg, trace) {
+          //console.log('Found error: '+msg);
+          var msgStack = ['ERROR: '.red + msg];
+          if (trace && trace.length) {
+            msgStack.push('TRACE:');
+            trace.forEach(function(t) {
+              msgStack.push(' -> ' + t.file + ': ' + t.line + (t.function ? ' (in function "' + t.function +'")' : ''));
+            });
           }
-          // other
-        }
-      })
-      page.set('onResourceError', function(resourceError) {
-        console.log('Unable to load resource (#' + resourceError.id + 'URL:' + resourceError.url + ')');
-        console.log('Error code: ' + resourceError.errorCode + '. Description: ' + resourceError.errorString);
-      });
-      page.set('onNavigationRequested', function(url, type, willNavigate, main) {
-        // Possible Future implementation :P
-      });
-      page.open(pageurl, function(status) {
-        if (status !== 'success') {
-          console.log('Unable to load' + pageurl);
-        }
-        page.includeJs("http://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js", function() {
-          page.evaluate(function() {
-            var object = {
-              aTags: [],
-              buttons: [],
-              doc: []
-            };
-            $("button").each(function() {
-              var button = $(this);
-              var rect = button[0].getBoundingClientRect();
-              var max = rect.height * rect.width;
-              button.children().each(function() {
-                var newRect = $(this)[0].getBoundingClientRect();
-                var newMax = newRect.width * newRect.height;
-                if (max < newMax) {
-                  max = newMax;
-                  rect = newRect;
-                }
-              });
-              if (rect.height != 0 && rect.width != 0)
-                object.buttons.push(JSON.stringify(rect));
-            });
-            $("a").each(function() {
-              var aTag = $(this);
-              var rect = aTag[0].getBoundingClientRect();
-              var max = rect.height * rect.width;
-              aTag.children().each(function() {
-                var newRect = $(this)[0].getBoundingClientRect();
-                var newMax = newRect.width * newRect.height;
-                if (max < newMax) {
-                  max = newMax;
-                  rect = newRect;
-                }
-              });
-              if (rect.height != 0 && rect.width != 0)
-                object.aTags.push(JSON.stringify(rect));
-            });
-            object.doc.push(document);
-            return object;
-          }, function(object) {
-            //now actually done
-            var doc = object.doc.pop(); // Document object
-            e.title = doc.title;
-            if (loadImage == true) {
-              var path = 'screenshots/' + host;
-              page.render('./' + path, {
-                format: 'jpeg',
-                quality: '60'
-              }, function() {
-                fs.writeFile('./' + host, JSON.stringify(object), analyzer.afterWrite(e, host));
-              });
-              e.capture = path;
+          // uncomment to log into the console 
+          console.error(msgStack.join('\n'));
+        });
+        page.set('settings.userAgent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1944.0 Safari/537.36');
+        page.set('settings.resourceTimeout', resTimeout);
+        page.set('onResourceReceived', function(response) {
+          if (response.stage == 'end') {
+            var url = response.url;
+            //		console.log(url);
+            hosturl = gethost(url);
+            type = response.contentType;
+            if (testjs(url, type)) { // resource is js
+              jsarr.push(url);
+              if (testextjs(hosturl, host)) {
+                extjsarr.push(url);
+              }
+            } else if (testcss(url, type)) { // resource is css
+              cssarr.push(url);
             }
-            e.js = extjsarr;
-
-            if (!live) {
-              e.save(function(err) {
-                if (err) return console.error(err);
-                donecount++;
-                console.info('Done '.green + donecount);
+            // other
+          }
+        })
+        page.set('onResourceError', function(resourceError) {
+          console.log('Unable to load resource (#' + resourceError.id + 'URL:' + resourceError.url + ')');
+          console.log('Error code: ' + resourceError.errorCode + '. Description: ' + resourceError.errorString);
+        });
+        page.set('onNavigationRequested', function(url, type, willNavigate, main) {
+          // Possible Future implementation :P
+        });
+        page.open(pageurl, function(status) {
+          if (status !== 'success') {
+            console.log('Unable to load' + pageurl);
+          }
+          page.includeJs("http://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js", function() {
+            if (linkAnalysis) {
+              page.evaluate(function() {
+                var object = {
+                  aTags: [],
+                  buttons: [],
+                  doc: []
+                };
+                $("button").each(function() {
+                  var button = $(this);
+                  var rect = button[0].getBoundingClientRect();
+                  var max = rect.height * rect.width;
+                  button.children().each(function() {
+                    var newRect = $(this)[0].getBoundingClientRect();
+                    var newMax = newRect.width * newRect.height;
+                    if (max < newMax) {
+                      max = newMax;
+                      rect = newRect;
+                    }
+                  });
+                  if (rect.height != 0 && rect.width != 0)
+                    object.buttons.push(JSON.stringify(rect));
+                });
+                $("a").each(function() {
+                  var aTag = $(this);
+                  var rect = aTag[0].getBoundingClientRect();
+                  var max = rect.height * rect.width;
+                  aTag.children().each(function() {
+                    var newRect = $(this)[0].getBoundingClientRect();
+                    var newMax = newRect.width * newRect.height;
+                    if (max < newMax) {
+                      max = newMax;
+                      rect = newRect;
+                    }
+                  });
+                  if (rect.height != 0 && rect.width != 0)
+                    object.aTags.push(JSON.stringify(rect));
+                });
+                object.doc.push(document);
+                return object;
+              }, function(object) {
+                afterEval(object);
               });
             } else {
-              emitter.emit('done');
+              page.evaluate(function() {
+                return document;
+              }, function(object) {
+                afterEval(object);
+              });
             }
-            console.log(e);
-            page.close();
-            ph.exit();
+            var afterEval = function(object) {
+              if (linkAnalysis) {
+                var doc = object.doc.pop(); // Document object
+                e.title = doc.title;
+              } else {
+                e.title = object.title;
+              }
+              if (loadImage && desktopSS) {
+                var path = 'screenshots/' + host;
+                setTimeout(function() {
+                  page.render('./' + path, {
+                    format: 'jpeg',
+                    quality: '60'
+                  }, function() {
+                    if (linkAnalysis)
+                      fs.writeFile('./' + host, JSON.stringify(object), analyzer.afterWrite(e, host));
+                  });
+                }, renderDelay);
+                e.capture = path;
+              }
+              e.js = extjsarr;
+              emitter.emit('done');
+              console.log(e);
+              setTimeout(function() {
+                page.close();
+                ph.exit();
+              }, renderDelay + 1);
+            }
           });
         });
       });
     });
-  });
-}
+  }
 
-//find all the urls from wwwranking
-//also calls addurl
-function findUrl() {
-  var url1 = "http://wwwranking.webdatacommons.org/Q/?pageIndex=";
-  var url2 = "&pageSize=";
+  //find all the urls from wwwranking
+  //also calls addurl
+  function findUrl() {
+    var url1 = "http://wwwranking.webdatacommons.org/Q/?pageIndex=";
+    var url2 = "&pageSize=";
 
-  j = 0;
-  var timer = setInterval(function() {
-    url3 = url1 + j + url2 + pageSize; //complete url
-    console.log('url3 = ' + url3);
-    download(url3, function(data) {
-      if (data) {
-        var json = JSON.parse(data);
-        for (i = 0; i < pageSize; i++) {
-          html = (json['data'][i]['harmonic']);
-          $ = cheerio.load(html);
-          link = $('a').attr('href');
-          addUrls(link);
-        }
-      } else console.log("error");
-      j++;
+    j = 0;
+    var timer = setInterval(function() {
+      url3 = url1 + j + url2 + pageSize; //complete url
+      console.log('url3 = ' + url3);
+      download(url3, function(data) {
+        if (data) {
+          var json = JSON.parse(data);
+          for (i = 0; i < pageSize; i++) {
+            html = (json['data'][i]['harmonic']);
+            $ = cheerio.load(html);
+            link = $('a').attr('href');
+            addUrls(link);
+          }
+        } else console.log("error");
+        j++;
+      });
+
+      if (j == (pageNo - 1)) { //
+        clearInterval(timer);
+        console.log('Fetching URLs is over.');
+      }
+
+    }, 10000)
+  }
+
+  // Utility function that downloads a URL and invokes
+  // callback with the data.
+  function download(url, callback) {
+    http.get(url, function(res) {
+      var data = "";
+      res.on('data', function(chunk) {
+        data += chunk;
+      });
+      res.on("end", function() {
+        callback(data);
+      });
+    }).on("error", function() {
+      callback(null);
     });
+  }
 
-    if (j == (pageNo - 1)) { //
-      clearInterval(timer);
-      console.log('Fetching URLs is over.');
-    }
-
-  }, 10000)
-}
-
-// Utility function that downloads a URL and invokes
-// callback with the data.
-function download(url, callback) {
-  http.get(url, function(res) {
-    var data = "";
-    res.on('data', function(chunk) {
-      data += chunk;
-    });
-    res.on("end", function() {
-      callback(data);
-    });
-  }).on("error", function() {
-    callback(null);
-  });
-}
-
-// Print existing data
-function printData(urls) {
-  urls.find(function(err, urls) {
-    if (err) return console.error(err);
-    console.log(urls)
-  })
-}
-
-// Refactor urls
-function addUrls(url) {
-  if (!addwCheck) { //do without check in db
-    var page = new Data({
-      url: url
-    })
-    page.save(function(err) {
+  // Print existing data
+  function printData(urls) {
+    urls.find(function(err, urls) {
       if (err) return console.error(err);
-      //saved
-      console.log(url + ' saved');
-    })
-  } else { //do with check if already present
-    Data.find({
-      url: url
-    }, function(err, arr) {
-      console.log('searching ' + url);
-      if (err) {
-        console.log(err);
-      }
-      if (arr.length == 0) {
-        var page = new Data({
-          url: url
-        })
-        page.save(function(err) {
-          if (err) return console.error(err);
-        })
-        console.log(url + ' added to ' + colName);
-      } else {
-        console.log(url + ' is already present.');
-      }
+      console.log(urls)
     })
   }
-}
 
-// Refactor alexa ranks
-var adone = 0;
-
-function addData(e) {
-  link = e.url;
-  if (e.alexa == null) {
-    console.log('Fetching alexa data for -> ' + e.url);
-    var aurl = 'http://data.alexa.com/data?cli=10&dat=snbamz&url=' + link;
-    var rank;
-    request(aurl, function(error, response, xml) {
-      if (!error && response.statusCode == 200) {
-        parseString(xml, function(err, result) {
-          e.alexa = result.ALEXA;
-          e.markModified('alexa');
-          if (!live) {
-            e.save(function(err) {
-              if (err) return console.error(err);
-              adone++;
-              console.log('Alexa Done '.green + adone);
-            })
-          }
-        });
-        /*
-        var $ = cheerio.load(xml, {
-    			xmlMode:true
-    		});
-        rank = $('REACH').attr('RANK');
-  			e.ltime = $('SPEED').attr('TEXT');
-  			e.ptime = $('SPEED').attr('PCT');
-    		if(rank) e.arank = rank;
-    		else if(typeof rank === 'undefined') {
-    			console.log ('Rank for '+aurl+ ' not available.');
-    		} */
-      } else console.log('Error fetching alexa data for ' + link);
-    });
-  } else console.log('Alexa Data already present for ' + link);
-}
+  // Refactor urls
+  function addUrls(url) {
+    if (!addwCheck) { //do without check in db
+      var page = new Data({
+        url: url
+      })
+      page.save(function(err) {
+        if (err) return console.error(err);
+        //saved
+        console.log(url + ' saved');
+      })
+    } else { //do with check if already present
+      Data.find({
+        url: url
+      }, function(err, arr) {
+        console.log('searching ' + url);
+        if (err) {
+          console.log(err);
+        }
+        if (arr.length == 0) {
+          var page = new Data({
+            url: url
+          })
+          page.save(function(err) {
+            if (err) return console.error(err);
+          })
+          console.log(url + ' added to ' + colName);
+        } else {
+          console.log(url + ' is already present.');
+        }
+      })
+    }
+  }

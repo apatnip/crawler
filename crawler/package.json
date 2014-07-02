@@ -6,15 +6,19 @@
     "url": "https://bitbucket.org/jagmal/connecto-intern"
   },
   "description": "This module automate the process of getting JS, CSS, and Screen Shots",
-  "author": ["Amar Sharma <amar@thoughtfabrics.com>", "Aseem Patni <aseem@thoughtfabrics.com>"],
+  "author": [
+    "Amar Sharma <amar@thoughtfabrics.com>",
+    "Aseem Patni <aseem@thoughtfabrics.com>"
+  ],
   "dependencies": {
     "cheerio": "*",
-    "mongoose": "* ",
-    "request": "*",
-    "phantom": "*",
+    "colors": "*",
     "commander": ">=2.2.0",
     "lodash": "*",
-    "colors": "*",
+    "mongoose": "* ",
+    "phantom": "*",
+    "request": "*",
+    "webshot": "^0.15.0",
     "xml2js": "*"
   }
 }

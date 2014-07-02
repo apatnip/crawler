@@ -1,8 +1,9 @@
 var request = require('request');
 var parseString = require('xml2js').parseString;
-var live = true;
-exports.init = function(Live) {
-  live = Live;
+var live;
+
+exports.init = function(configs, isLive) {
+  live = isLive == true;
 }
 var adone = 0;
 exports.append = function(e) {

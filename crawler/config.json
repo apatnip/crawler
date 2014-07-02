@@ -6,7 +6,7 @@
   "dbServer": "192.168.100.73",
   "dbPort": 27017,
 
-  "getAlexa": false,
+  "getAlexa": true,
   "getNewUrls": false,
   "getJs": true,
   "pageInsightD": false,
@@ -14,7 +14,8 @@
 
   "screenShots": true,
   "takeScrShotDesktop": true,
-  "takeScrShotMobile": false,
+  "takeScrShotMobile": true,
+
   "desktopScreen": {
     "width": 1366,
     "height": 768
@@ -23,7 +24,7 @@
     "width": 320,
     "height": 480
   },
-  "scrShotRenderDelay": 2500,
+  "scrShotRenderDelay": 200,
   "bgWhite": true,
   "resourceTimeOut": 60000,
   "slots_NoOfUrlsToFetch": 1,
@@ -32,8 +33,9 @@
   "checkIfExistsInDB": true,
   "printDB": false,
   "queryToDB": "",
+  "imageAnalysis": false,
   "noOfURLsToFetch": 5,
   "slotsOfFetching": 2,
   "executeInterval": 5000,
-  "concurrentProcessing": 5
+  "noOfConcurrentProcess": 5
 }

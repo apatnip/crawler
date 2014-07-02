@@ -5,7 +5,6 @@ import cv2
 import numpy as np
 from pprint import pprint
 from matplotlib import pyplot as plt
-from pprint import pprint
 from sklearn.cluster import KMeans
 
 font = cv2.FONT_HERSHEY_SIMPLEX
@@ -68,19 +67,11 @@ def containsLink (x,y,link):
 	xLink = int(link['left'])
 	height = int(link['height'])
 	width = int(link['width'])
-	if containsPoint(x,y,xLink+ width/2,yLink+height/2):
-		return True
-	'''
-	if containsPoint(x,y,xLink,yLink):
-		return True
-	if containsPoint(x,y,xLink+width,yLink):
-		return True
-	if containsPoint(x,y,xLink,yLink+height):
-		return True
-	if containsPoint(x,y,xLink+width,yLink+height):
-		return True
-		'''
-	return False
+	if xLink > x+boxSize or x >xLink + width:
+		return False
+	if yLink >y + boxSize or y > yLink + height:
+		return False
+	return True
 
 # Checks if a point is inside a box
 def containsPoint (x,y,xp,yp):
@@ -132,7 +123,7 @@ def getLinkDensity():
 			b = int(max(0, (255*(1 - counter/halfmax))))
 			g = 255-b-r
 		#	cv2.putText(overlay,str(counter),(x+boxSize/3,y+boxSize/2), font, 2,(b,g,r),3, cv2.FONT_HERSHEY_PLAIN)
-			if counter>=halfmax/3:
+			if counter>=halfmax/2:
 				cv2.rectangle(img,(x+boxSize/2 - moveSize/2,y+boxSize/2 -moveSize/2),(x+boxSize/2 +moveSize/2,y+boxSize/2 + moveSize/2),(b,g,r),-1)
 			if x+boxSize>widthPage:
 				break
@@ -144,7 +135,7 @@ with open(cordinates) as data_file:
     data = json.load(data_file)
 
 # Remove coordinates file
-#os.remove(cordinates)
+# os.remove(cordinates)
 
 contrastCal()
 
@@ -170,10 +161,10 @@ cv2.line(img,(right,0),(right,heightPage),(255,0,0),5)
 # Find number of links in boxes
 getLinkDensity()
 
-#blur = cv2.blur(img,(50,50))
+blur = cv2.blur(img,(moveSize/2,moveSize/2))
 
-opacity = 0.2
-cv2.addWeighted(overlay, opacity, img, 1 - opacity, 0, img)
+opacity = 0.8
+cv2.addWeighted(overlay, opacity, blur, 1 - opacity, 0, img)
 
 # Save image
 saveImage = image+'-analyzed.jpg'
