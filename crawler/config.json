@@ -8,7 +8,7 @@
 
   "getAlexa": true,
   "getNewUrls": false,
-  "getJs": true,
+  "getJs": false,
   "pageInsightD": false,
   "pageInsightM": false,
 

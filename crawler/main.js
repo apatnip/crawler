@@ -100,7 +100,8 @@ pool.push = function(request) {
   e = request.obj;
   console.log('Adding %s to pool', e.url);
   x = Array.prototype.push.apply(this, arguments);
-  printpool();
+  console.log('Added %s to pool'.blue, e.url);
+  //printpool();
   if (processing.length < concurrentProcessing) {
     console.log('%d jobs processing', processing.length);
     processing.push((pool.splice(0, 1))[0]);
@@ -109,26 +110,27 @@ pool.push = function(request) {
 }
 
 processing.push = function(process) {
+  var done = process.done = {alexa:false, js:false, psim:false, psid:false};
   e = process.obj;
-  console.log('%s is now processing', e.url);
+  console.log('%s is now processing'.yellow, e.url);
   emitter = process.emitter;
   x = Array.prototype.push.apply(this, arguments);
   printpool();
-  if (jsMode) findRes(e, emitter);
-  if (psidMode) psi.append(e, 'desktop');
-  if (psimMode) psi.append(e, 'mobile');
-  if (alexaMode) alexa.append(e);
+  if (jsMode) findRes(process);
+  if (psidMode) psi.append(process, 'desktop');
+  if (psimMode) psi.append(process, 'mobile');
+  if (alexaMode) alexa.append(process);
   return x;
 }
 
 function printpool() {
   console.log('Pool contains: ');
   for (i = 0; i < pool.length; i++) {
-    console.log('( %d ) %s', i, pool[i].obj.url);
+    console.log('( %d ) %s', i+1, pool[i].obj.url);
   }
   console.log('Now processing: ');
   for (i = 0; i < processing.length; i++) {
-    console.log('( %d ) %s', i, processing[i].obj.url);
+    console.log('( %d ) %s', i+1, processing[i].obj.url);
   }
 }
 
@@ -166,7 +168,12 @@ exports.liveServer = function(url, res) {
     */
   });
 };
-
+function checkdone(done) {
+  console.log(done);
+  if (done.alexa == alexaMode && done.js == jsMode && done.psid == psidMode && done.psim == psimMode) return true;
+  else return false;
+}
+// Automated Version
 exports.automate = function() {
   var con = mongoose.connection;
   con.on('error', console.error.bind(console, 'connection error:'));
@@ -184,22 +191,27 @@ exports.automate = function() {
 }
 
 function executeThrottled() {
+  console.log('Max number of concurrent process = '+concurrentProcessing);
   donecount = 0;
   Data.find(query, function(err, arr) {
     arr.forEach(function(element, index, array) {
-      if (index < noofpages) {
+      if(index<noofpages || noofpages==0) {
         var request = {};
         request.obj = element;
         request.emitter = new events.EventEmitter();
         pool.push(request);
         request.emitter.on('done', function() {
-          e.save(function(err) {
-            if (err) return console.error(err);
-            donecount++;
-            console.info('Done '.green + donecount);
-          })
-          processing.splice(processing.indexOf(request), 1);
-          if (pool.length > 0) processing.push((pool.splice(0, 1))[0]);
+          if(checkdone(request.done)) {
+            e.save(function(err) {
+              if (err) return console.error(err);
+              console.log(e);
+              donecount++;
+              console.info('Done '.green + donecount);
+            })
+            processing.splice(processing.indexOf(request), 1);
+            if (pool.length > 0) processing.push((pool.splice(0, 1))[0]);
+            else printpool();
+          }
         });
       }
     })
@@ -267,8 +279,10 @@ var gethost = function(href) {
     return false;
   }
 
-  function findRes(e, emitter) {
+  function findRes(process) {
     var pageurl = e.url;
+	e = process.obj;
+  emitter = process.emitter;
     var crash = phantom.crash(pageurl);
     crash.once('error', function() {
       e.crash = true;
@@ -345,7 +359,7 @@ var gethost = function(href) {
                     fs.writeFile('./' + host + '-m', JSON.stringify(object), analyzer.afterWrite(e, host + '-m'));
                 });
               }, renderDelay);
-              e.mcapture = path;
+              e.capture.mobile = path;
               setTimeout(function() {
                 page.close();
                 ph.exit();
@@ -485,9 +499,10 @@ var gethost = function(href) {
                       fs.writeFile('./' + host, JSON.stringify(object), analyzer.afterWrite(e, host));
                   });
                 }, renderDelay);
-                e.capture = path;
+                e.capture.desktop = path;
               }
               e.js = extjsarr;
+				process.js.done = true;
               emitter.emit('done');
               console.log(e);
               setTimeout(function() {
