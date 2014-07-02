@@ -62,12 +62,12 @@ var qprint = false; // whether print database
 
 // automated config
 var query = {};
-var noofpages = 10; // 0 for execution on all the results of the query
+var noofpages = 0; // 0 for execution on all the results of the query
 var slots = 10;
 var executeInterval = 5000;
 
 // Queue config
-var concurrentProcessing = 5;
+var concurrentProcessing = 50;
 
 var pool = [];
 var processing = [];
@@ -85,16 +85,15 @@ pool.push = function(request) {
 }
 
 processing.push = function(process) {
-  var done = process.done = {alexa:false, js:false, psim:false, psid:false}
-
+  var done = process.done = {alexa:false, js:false, psim:false, psid:false};
   e = process.obj;
   console.log('%s is now processing'.yellow, e.url);
   emitter = process.emitter;
   x = Array.prototype.push.apply(this, arguments);
   printpool();
-  if (jsMode) findRes(e, emitter, done.js);
-  if (psidMode) psi.append(e, 'desktop', emitter, done.psid);
-  if (psimMode) psi.append(e, 'mobile', emitter, done.psim);
+  if (jsMode) findRes(process);
+  if (psidMode) psi.append(process, 'desktop');
+  if (psimMode) psi.append(process, 'mobile');
   if (alexaMode) alexa.append(process);
   return x;
 }
@@ -102,11 +101,11 @@ processing.push = function(process) {
 function printpool() {
   console.log('Pool contains: ');
   for (i = 0; i < pool.length; i++) {
-    console.log('( %d ) %s', i, pool[i].obj.url);
+    console.log('( %d ) %s', i+1, pool[i].obj.url);
   }
   console.log('Now processing: ');
   for (i = 0; i < processing.length; i++) {
-    console.log('( %d ) %s', i, processing[i].obj.url);
+    console.log('( %d ) %s', i+1, processing[i].obj.url);
   }
 }
 
@@ -149,6 +148,7 @@ exports.liveServer = function(url, res) {
   });
 };
 function checkdone(done) {
+  console.log(done);
   if (done.alexa == alexaMode && done.js == jsMode && done.psid == psidMode && done.psim == psimMode) return true;
   else return false;
 }
@@ -183,11 +183,13 @@ function executeThrottled() {
           if(checkdone(request.done)) {
             e.save(function(err) {
               if (err) return console.error(err);
+              console.log(e);
               donecount++;
               console.info('Done '.green + donecount);
             })
             processing.splice(processing.indexOf(request), 1);
             if (pool.length > 0) processing.push((pool.splice(0, 1))[0]);
+            else printpool();
           }
         });
       }
@@ -253,9 +255,10 @@ function testimg(url, type) {
 }
 
 
-function findRes(e, emitter, done) {
+function findRes(process) {
   var pageurl = e.url;
-
+  e = process.obj;
+  emitter = process.emitter;
   // Crash Object
   var crash = phantom.crash(pageurl);
   crash.once('error', function() {
@@ -392,9 +395,8 @@ function findRes(e, emitter, done) {
               e.capture.desktop = path;
             }
             e.js = extjsarr;
-            done = true;
+            process.js.done = true;
             emitter.emit('done');
-            console.log(e);
             page.close();
             ph.exit();
           });
