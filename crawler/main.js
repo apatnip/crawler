@@ -367,8 +367,6 @@ function findRes(e, emitter) {
               e.capture = path;
             }
             e.js = extjsarr;
-
-
             emitter.emit('done');
             console.log(e);
             page.close();
