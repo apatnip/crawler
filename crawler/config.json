@@ -6,11 +6,11 @@
   "dbServer": "localhost",
   "dbPort": 27017,
 
-  "getAlexa": true,
+  "getAlexa": false,
   "getNewUrls": false,
   "getJs": true,
-  "pageInsightD": true,
-  "pageInsightM": true,
+  "pageInsightD": false,
+  "pageInsightM": false,
 
   "takeScrShot": true,
   "desktopScreen": {

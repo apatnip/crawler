@@ -1,35 +1,29 @@
-* Copy phantom.js from crawler to crawler/node_modules/phantom/.
-* Screenshot are automatically saved to crawler/img named <domain>/png for all the queried pages.
-
-
-* Support automated as well as live version.
-
 # README #
 
-This README would normally document whatever steps are necessary to get your application up and running.
+Project Crawler
 
-### What is this repository for? ###
+### Setup ###
 
-* Quick summary
-* Version
-* [Learn Markdown](https://bitbucket.org/tutorials/markdowndemo)
+* Clone the Repository
+* Run in terminal 
+```npm install
+```
+* Copy phantom.js from crawler to crawler/node_modules/phantom/.
 
-### How do I get set up? ###
+### Configuration ###
 
-* Summary of set up
-* Configuration
-* Dependencies
-* Database configuration
-* How to run tests
-* Deployment instructions
+* Manual configuration file can be provided in JSON file using -c option.
+* Default configuration file is provided in repository named "config.json"
 
-### Contribution guidelines ###
+### Running ###
 
-* Writing tests
-* Code review
-* Other guidelines
+  Usage: server [options]
 
-### Who do I talk to? ###
+  Options:
 
-* Repo owner or admin
-* Other community or team contact
+    -h, --help                     output usage information
+    -V, --version                  output the version number
+    -a, --automate                 Automate the whole process
+    -r, --realtime                 Will make a live server on localhost with Port specified in config
+    -c, --config [value]           Path to config file
+

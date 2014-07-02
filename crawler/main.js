@@ -321,28 +321,43 @@ function findRes(e, emitter) {
         page.includeJs("http://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js", function() {
           page.evaluate(function() {
            // if(linkAnalysis) {
-              var object = {
-                aTags: [],
-                doc: []
-              };
-              $("a:visible").each(function() {
-                var aTag = $(this);
-                if(! $(this).visible) console.log('get it')
-                var rect = aTag[0].getBoundingClientRect();
-                var max = rect.height * rect.width;
-                aTag.children().each(function() {
-                  var newRect = $(this)[0].getBoundingClientRect();
-                  var newMax = newRect.width * newRect.height;
-                  if (max < newMax) {
-                    max = newMax;
-                    rect = newRect;
-                  }
-                });
-                if (rect.height != 0 && rect.width != 0)
-                  object.aTags.push(JSON.stringify(rect));
+            var object = {
+              aTags: [],
+              buttons: [],
+              doc: []
+            };
+            $("button").each(function() {
+              var button = $(this);
+              var rect = button[0].getBoundingClientRect();
+              var max = rect.height * rect.width;
+              button.children().each(function() {
+                var newRect = $(this)[0].getBoundingClientRect();
+                var newMax = newRect.width * newRect.height;
+                if (max < newMax) {
+                  max = newMax;
+                  rect = newRect;
+                }
               });
-              object.doc.push(document);
-              return object;  
+              if (rect.height != 0 && rect.width != 0)
+                object.buttons.push(JSON.stringify(rect));
+            });
+            $("a").each(function() {
+              var aTag = $(this);
+              var rect = aTag[0].getBoundingClientRect();
+              var max = rect.height * rect.width;
+              aTag.children().each(function() {
+                var newRect = $(this)[0].getBoundingClientRect();
+                var newMax = newRect.width * newRect.height;
+                if (max < newMax) {
+                  max = newMax;
+                  rect = newRect;
+                }
+              });
+              if (rect.height != 0 && rect.width != 0)
+                object.aTags.push(JSON.stringify(rect));
+            });
+            object.doc.push(document);
+            return object;
             //}
            // else return document;
           }, function(object) {
