@@ -15,6 +15,18 @@ Project Crawler
 * Manual configuration file can be provided in JSON file using -c option.
 * Default configuration file is provided in repository named "config.json"
 
+### What you can use it for ###
+
+* To get URLS from wwwranking
+* To find out what tools are used by any website (external JS).
+* To get alexa data
+* To get PageSpeed Insights data
+* To find contrast ratio & link density in webpages.(Image Processing)
+
+### Directions to Use ###
+
+*  It can be used to get URLs and to process them. However it recommended to do one at a time.
+
 ### Running ###
 
   Usage: server [options]
