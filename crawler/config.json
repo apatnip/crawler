@@ -6,7 +6,7 @@
   "dbServer": "192.168.100.73",
   "dbPort": 27017,
 
-  "getAlexa": false,
+  "getAlexa": true,
   "getNewUrls": false,
   "getJs": true,
   "pageInsightD": false,

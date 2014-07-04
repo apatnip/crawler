@@ -19,17 +19,17 @@ var db = require('./model/db');
 var pool = [];
 var processing = [];
 
-// GET parameters
+//GET parameters
 var qfindurls = false; // Whether add urls from www ranking
 
-// Modes for fetching data
+//Modes for fetching data
 var alexaMode = true; // Whether get alexa data
 var jsMode = true; // get resources (js)
 var psidMode = true; // get PageSpeed insights for desktop
 var psimMode = true; // get PageSpeed Insights for mobile
 var linkAnalysis = false;
 
-// config
+//config
 var resourceTimeOut = 120000; // Resource timeout
 var pageSize = 1000; // Get data from wwwranking in slots of?
 var pageNo = 10; // No of slots
@@ -45,6 +45,8 @@ var mobileScreen = {
   "width": 320,
   "height": 480
 }
+var linkDensity = false;
+var contrast = false;
 var colName = 'thoupages'; // Collection name
 var addwCheck = true; // Add to db with check if already exists
 var qprint = false; // whether print database
@@ -80,21 +82,26 @@ exports.init = function(file, isLive) {
   jsMode = configs.analyse.js;
   // Page speed Insights
   insights = configs.modes.pageSpeedInsights
-  psidMode  = insights.desktop;
+  psidMode = insights.desktop;
   psimMode = insights.mobile;
+
   // Screenshot
   desktopSS = configs.analyse.screenshot.desktop;
   mobileSS = configs.analyse.screenshot.mobile;
+
+  // Image Analysis
+  linkDensity = configs.analyse.links.density;
+  contrast = configs.analyse.links.contrast;
+
   // Resolution
   resolution = configs.analyse.resolution;
   desktopScreen = resolution.desktop;
   mobileScreen = resolution.mobile;
-
   resourceTimeOut = configs.analyse.resourceTimeOut;
+
   // Database
   colName = configs.db.collection;
-  db.init(configs.db.server, configs.db.port, live,colName);
-  
+  db.init(configs.db.server, configs.db.port, live, colName);
   qprint = configs.printDB;
   query = configs.queryToDB;
   noofpages = configs.noOfURLsToFetch;
@@ -120,6 +127,7 @@ pool.push = function(request) {
 
 processing.push = function(process) {
   var done = process.done = {
+    url: process.obj.url,
     alexa: false,
     js: false,
     psim: false,
@@ -139,11 +147,11 @@ processing.push = function(process) {
 function printpool() {
   console.log('Pool contains: ');
   for (i = 0; i < pool.length; i++) {
-    console.log('( %d ) %s', i+1, pool[i].obj.url);
+    console.log('( %d ) %s', i + 1, pool[i].obj.url);
   }
   console.log('Now processing: ');
   for (i = 0; i < processing.length; i++) {
-    console.log('( %d ) %s', i+1, processing[i].obj.url);
+    console.log('( %d ) %s', i + 1, processing[i].obj.url);
   }
 }
 
@@ -165,27 +173,18 @@ exports.liveServer = function(url, res) {
     console.log('Crashed: '.red + crash.url);
     res.end(url + ' sucks :-P ' + 'It crashed!!\n');
   });
-  request.emitter.on('done', function() {
-    if(checkdone(request.done)) {
+  request.emitter.on('done', function(done) {
+    if (checkdone(done)) {
       processing.splice(processing.indexOf(request), 1);
       if (pool.length > 0) processing.push((pool.splice(0, 1))[0]);
       else printpool();
       res.end(JSON.stringify(request.obj, null, 2) + '\n');
-      /*
-      path = './'+e.capture;
-      console.log(path);
-      fs.readFile(path, function(error, file) {
-        if(error) console.log('Error reading file');
-        var imagedata = new Buffer(file).toString('base64');
-        res.write("hi there!<img src='data:my_pic.jpg;base64,"+imagedata+"'/>");
-      });
-      */
     }
   });
 };
 
 function checkdone(done) {
-  console.log(done);
+  console.log(JSON.stringify(done).magenta);
   if (done.alexa == alexaMode && done.js == jsMode && done.psid == psidMode && done.psim == psimMode) return true;
   else return false;
 }
@@ -218,12 +217,12 @@ function executeThrottled() {
         request.emitter = emitter;
         pool.push(request);
         request.emitter.on('done', function(done) {
-          console.log('received done: '+done);
+          console.log('received done: ' + done);
           console.log(request);
-          if(checkdone(request.done)) {
+          if (checkdone(done)) {
             e.save(function(err) {
               if (err) return console.error(err);
-              console.log(e);
+              console.log('Increased done for'.red + e);
               donecount++;
               console.info('Done '.green + donecount);
             })
@@ -236,7 +235,7 @@ function executeThrottled() {
     })
   });
 }
-/*
+
 function execute() {
   Data.find(query, function(err, arr) {
     var add = 0;
@@ -260,7 +259,7 @@ function execute() {
     }, executeInterval);
   });
 }
-*/
+
 String.prototype.endsWith = function(suffix) {
   return this.indexOf(suffix, this.length - suffix.length) !== -1;
 };
@@ -290,336 +289,344 @@ var gethost = function(href) {
   urlo = url.parse(href);
   return urlo.host;
 }
-function testimg(url, type) {
-  if (url.endsWith('.jpg')) return true;
-  if (url.endsWith('.png')) return true;
-  if (url.endsWith('.gif')) return true;
-  return false;
-}
 
-function findRes(process) {
-  var pageurl = e.url;
-  e = process.obj;
-  emitter = process.emitter;
-  // Crash Object
-  var crash = phantom.crash(pageurl);
-  crash.once('error', function() {
-    e.crash = true;
-    console.error('Crashed: '.yellow + crash.url);
-    console.error(pageurl + ' sucks :-P It crashed!!\n');
-    if (!live) {
-      e.save(function(err) {});
-    }
-  });
-  if (mobileSS) {
-    phantom.create(function(ph) {
-      ph.createPage(function(page) {
-        page.set('viewportSize', {
-          width: mobileScreen.width,
-          height: mobileScreen.height
-        });
-        var host = gethost(pageurl);
-        page.set('settings.userAgent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 7_1 like Mac OS X) AppleWebKit/537.51.2 (KHTML, like Gecko) Version/7.0 Mobile/11D5145e Safari/9537.53');
-        page.set('settings.resourceTimeout', resourceTimeOut);
-        page.open(pageurl, function(status) {
-          if (status !== 'success') {
-            console.log('Unable to load in mobile' + pageurl);
-          }
-          page.includeJs("http://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js", function() {
-            page.evaluate(function() {
-              var object = {
-                aTags: [],
-                buttons: [],
-              };
-              $("button").each(function() {
-                var button = $(this);
-                var rect = button[0].getBoundingClientRect();
-                var max = rect.height * rect.width;
-                button.children().each(function() {
-                  var newRect = $(this)[0].getBoundingClientRect();
-                  var newMax = newRect.width * newRect.height;
-                  if (max < newMax) {
-                    max = newMax;
-                    rect = newRect;
-                  }
-                });
-                if (rect.height != 0 && rect.width != 0)
-                  object.buttons.push(JSON.stringify(rect));
-              });
-              $("a").each(function() {
-                var aTag = $(this);
-                var rect = aTag[0].getBoundingClientRect();
-                var max = rect.height * rect.width;
-                aTag.children().each(function() {
-                  var newRect = $(this)[0].getBoundingClientRect();
-                  var newMax = newRect.width * newRect.height;
-                  if (max < newMax) {
-                    max = newMax;
-                    rect = newRect;
-                  }
-                });
-                if (rect.height != 0 && rect.width != 0)
-                  object.aTags.push(JSON.stringify(rect));
-              });
-              return object;
-            }, function(object) {
-              afterEvalM(object);
-            });
-          });
-
-          function afterEvalM(object) {
-            var path = 'screenshots/' + host + '-m';
-            setTimeout(function() {
-              page.render('./' + path, {
-                format: 'jpeg',
-                quality: '60'
-              }, function() {
-                if (linkAnalysis) {
-                  fs.writeFile('./' + host + '-m', JSON.stringify(object), analyzer.afterWrite(e, host + '-m'));
-                }
-              });
-            }, renderDelay);
-            e.capture.mobile = path;
-            setTimeout(function() {
-              page.close();
-              ph.exit();
-            }, renderDelay + 1);
-          }
-        });
-      });
-    });
+  function testimg(url, type) {
+    if (url.endsWith('.jpg')) return true;
+    if (url.endsWith('.png')) return true;
+    if (url.endsWith('.gif')) return true;
+    return false;
   }
-  phantom.create(function(ph) {
-    ph.onError = function(msg, trace) {
-      var msgStack = ['PHANTOM ERROR: ' + msg];
-      if (trace && trace.length) {
-        msgStack.push('TRACE:');
-        trace.forEach(function(t) {
-          msgStack.push(' -> ' + (t.file || t.sourceURL) + ': ' + t.line + (t.function ? ' (in function ' + t.function +')' : ''));
-        });
+
+  function findRes(process) {
+    var pageurl = e.url;
+    e = process.obj;
+    emitter = process.emitter;
+    // Crash Object
+    var crash = phantom.crash(pageurl);
+    crash.once('error', function() {
+      e.crash = true;
+      console.error('Crashed: '.yellow + crash.url);
+      console.error(pageurl + ' sucks :-P It crashed!!\n');
+      if (!live) {
+        e.save(function(err) {});
       }
-      console.error(msgStack.join('\n'));
-    };
-    ph.createPage(function(page) {
-      page.set('viewportSize', {
-          width: desktopScreen.width,
-          height: desktopScreen.height
-      });
-      var jsarr = [];
-      var cssarr = [];
-      var extjsarr = [];
-      var host = gethost(pageurl);
-      page.set('onError', function(msg, trace) {
-        //console.log('Found error: '+msg);
-        var msgStack = ['ERROR: '.red + msg];
-        if (trace && trace.length) {
-          msgStack.push('TRACE:');
-          trace.forEach(function(t) {
-            msgStack.push(' -> ' + t.file + ': ' + t.line + (t.function ? ' (in function "' + t.function +'")' : ''));
+    });
+
+    if (mobileSS) {
+      phantom.create(function(ph) {
+        ph.createPage(function(page) {
+          page.set('viewportSize', {
+            width: mobileScreen.width,
+            height: mobileScreen.height
           });
-        }
-        // uncomment to log into the console 
-        console.error(msgStack.join('\n'));
-      });
-      page.set('settings.userAgent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1944.0 Safari/537.36');
-      page.set('settings.resourceTimeout', resourceTimeOut);
-      page.set('onResourceReceived', function(response) {
-        if (response.stage == 'end') {
-          var url = response.url;
-          //		console.log(url);
-          hosturl = gethost(url);
-          type = response.contentType;
-          if (testjs(url, type)) { // resource is js
-            jsarr.push(url);
-            if (testextjs(hosturl, host)) {
-              extjsarr.push(url);
+
+          var host = gethost(pageurl);
+          page.set('settings.userAgent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 7_1 like Mac OS X) AppleWebKit/537.51.2 (KHTML, like Gecko) Version/7.0 Mobile/11D5145e Safari/9537.53');
+          page.set('settings.resourceTimeout', resourceTimeOut);
+          page.open(pageurl, function(status) {
+            if (status !== 'success') {
+              console.log('Unable to load in mobile' + pageurl);
             }
-          } else if (testcss(url, type)) { // resource is css
-            cssarr.push(url);
-          }
-          // other
-        }
-      })
-      page.set('onResourceError', function(resourceError) {
-        console.log('Unable to load resource (#' + resourceError.id + 'URL:' + resourceError.url + ')');
-        console.log('Error code: ' + resourceError.errorCode + '. Description: ' + resourceError.errorString);
-      });
-      page.set('onNavigationRequested', function(url, type, willNavigate, main) {
-        //  if(main) console.log('Trying to navigate to: ' + url);
-        //  console.log('Caused by: ' + type);
-        // 	console.log('Will actually navigate: ' + willNavigate);
-      });
-      page.open(pageurl, function(status) {
-        if (status !== 'success') {
-          console.log('Unable to load' + pageurl);
-        }
-        page.includeJs("http://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js", function() {
-          if (linkAnalysis) {
-            page.evaluate(function() {
-              var object = {
-                aTags: [],
-                buttons: [],
-                doc: []
-              };
-              $("button").each(function() {
-                var button = $(this);
-                var rect = button[0].getBoundingClientRect();
-                var max = rect.height * rect.width;
-                button.children().each(function() {
-                  var newRect = $(this)[0].getBoundingClientRect();
-                  var newMax = newRect.width * newRect.height;
-                  if (max < newMax) {
-                    max = newMax;
-                    rect = newRect;
-                  }
+
+            page.includeJs("http://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js", function() {
+              page.evaluate(function() {
+                var object = {
+                  aTags: [],
+                  buttons: [],
+                };
+                $("button").each(function() {
+                  var button = $(this);
+                  var rect = button[0].getBoundingClientRect();
+                  var max = rect.height * rect.width;
+                  button.children().each(function() {
+                    var newRect = $(this)[0].getBoundingClientRect();
+                    var newMax = newRect.width * newRect.height;
+                    if (max < newMax) {
+                      max = newMax;
+                      rect = newRect;
+                    }
+                  });
+                  if (rect.height != 0 && rect.width != 0)
+                    object.buttons.push(JSON.stringify(rect));
                 });
-                if (rect.height != 0 && rect.width != 0)
-                  object.buttons.push(JSON.stringify(rect));
-              });
-              $("a").each(function() {
-                var aTag = $(this);
-                var rect = aTag[0].getBoundingClientRect();
-                var max = rect.height * rect.width;
-                aTag.children().each(function() {
-                  var newRect = $(this)[0].getBoundingClientRect();
-                  var newMax = newRect.width * newRect.height;
-                  if (max < newMax) {
-                    max = newMax;
-                    rect = newRect;
-                  }
+
+                $("a").each(function() {
+                  var aTag = $(this);
+                  var rect = aTag[0].getBoundingClientRect();
+                  var max = rect.height * rect.width;
+                  aTag.children().each(function() {
+                    var newRect = $(this)[0].getBoundingClientRect();
+                    var newMax = newRect.width * newRect.height;
+                    if (max < newMax) {
+                      max = newMax;
+                      rect = newRect;
+                    }
+                  });
+                  if (rect.height != 0 && rect.width != 0)
+                    object.aTags.push(JSON.stringify(rect));
                 });
-                if (rect.height != 0 && rect.width != 0)
-                  object.aTags.push(JSON.stringify(rect));
+                return object;
+              }, function(object) {
+                afterEvalM(object);
               });
-              object.doc.push(document);
-              return object;
-            }, function(object) {
-              afterEval(object);
             });
-          } else { // Link analysis not required
-            page.evaluate(function() {
-              return document;
-            }, function(object) {
-              afterEval(object);
-            });
-          }
-          var afterEval = function(object) {
-            if (linkAnalysis) {
-              var doc = object.doc.pop(); // Document object
-              e.title = doc.title;
-            } else {
-              e.title = object.title;
-            }
-            if (loadImage && desktopSS) {
-              var path = 'screenshots/' + host;
+
+            function afterEvalM(object) {
+              var path = 'screenshots/' + host + '-m';
               setTimeout(function() {
                 page.render('./' + path, {
                   format: 'jpeg',
                   quality: '60'
                 }, function() {
-                  if (linkAnalysis)
-                    fs.writeFile('./' + host, JSON.stringify(object), analyzer.afterWrite(e, host));
+                  if (linkAnalysis) {
+                    fs.writeFile('./' + host + '-m', JSON.stringify(object), analyzer.afterWrite(path, host + '-m', contrast, linkDensity));
+                  }
                 });
               }, renderDelay);
-              e.capture.desktop = path;
+              e.capture.mobile = path;
+              setTimeout(function() {
+                page.close();
+                ph.exit();
+              }, renderDelay + 1);
             }
-            e.js = extjsarr;
-            process.done.js = true;
-            emitter.emit('done');
-            console.log(e);
-            setTimeout(function() {
-              page.close();
-              ph.exit();
-            }, renderDelay + 1);
+          });
+        });
+      });
+    }
+    phantom.create(function(ph) {
+      ph.onError = function(msg, trace) {
+        var msgStack = ['PHANTOM ERROR: ' + msg];
+        if (trace && trace.length) {
+          msgStack.push('TRACE:');
+          trace.forEach(function(t) {
+            msgStack.push(' -> ' + (t.file || t.sourceURL) + ': ' + t.line + (t.function ? ' (in function ' + t.function +')' : ''));
+          });
+        }
+        console.error(msgStack.join('\n'));
+      };
+      ph.createPage(function(page) {
+        page.set('viewportSize', {
+          width: desktopScreen.width,
+          height: desktopScreen.height
+        });
+
+        var jsarr = [];
+        var cssarr = [];
+        var extjsarr = [];
+        var host = gethost(pageurl);
+        page.set('onError', function(msg, trace) {
+          //console.log('Found error: '+msg);
+          var msgStack = ['ERROR: '.red + msg];
+          if (trace && trace.length) {
+            msgStack.push('TRACE:');
+            trace.forEach(function(t) {
+              msgStack.push(' -> ' + t.file + ': ' + t.line + (t.function ? ' (in function "' + t.function +'")' : ''));
+            });
           }
+          // uncomment to log into the console 
+          console.error(msgStack.join('\n'));
+        });
+        page.set('settings.userAgent', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/36.0.1944.0 Safari/537.36');
+        page.set('settings.resourceTimeout', resourceTimeOut);
+        page.set('onResourceReceived', function(response) {
+          if (response.stage == 'end') {
+            var url = response.url;
+            //		console.log(url);
+            hosturl = gethost(url);
+            type = response.contentType;
+            if (testjs(url, type)) { // resource is js
+              jsarr.push(url);
+              if (testextjs(hosturl, host)) {
+                extjsarr.push(url);
+              }
+            } else if (testcss(url, type)) { // resource is css
+              cssarr.push(url);
+            }
+            // other
+          }
+        })
+        page.set('onResourceError', function(resourceError) {
+          console.log('Unable to load resource (#' + resourceError.id + 'URL:' + resourceError.url + ')');
+          console.log('Error code: ' + resourceError.errorCode + '. Description: ' + resourceError.errorString);
+        });
+        page.set('onNavigationRequested', function(url, type, willNavigate, main) {
+          // Possible Future implementation :P
+        });
+        page.open(pageurl, function(status) {
+          if (status !== 'success') {
+            console.log('Unable to load' + pageurl);
+            return;
+          }
+          page.includeJs("http://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js", function() {
+            if (linkAnalysis) {
+              page.evaluate(function() {
+                var object = {
+                  aTags: [],
+                  buttons: [],
+                  doc: []
+                };
+                $("button").each(function() {
+                  var button = $(this);
+                  var rect = button[0].getBoundingClientRect();
+                  var max = rect.height * rect.width;
+                  button.children().each(function() {
+                    var newRect = $(this)[0].getBoundingClientRect();
+                    var newMax = newRect.width * newRect.height;
+                    if (max < newMax) {
+                      max = newMax;
+                      rect = newRect;
+                    }
+                  });
+                  if (rect.height != 0 && rect.width != 0)
+                    object.buttons.push(JSON.stringify(rect));
+                });
+                $("a").each(function() {
+                  var aTag = $(this);
+                  var rect = aTag[0].getBoundingClientRect();
+                  var max = rect.height * rect.width;
+                  aTag.children().each(function() {
+                    var newRect = $(this)[0].getBoundingClientRect();
+                    var newMax = newRect.width * newRect.height;
+                    if (max < newMax) {
+                      max = newMax;
+                      rect = newRect;
+                    }
+                  });
+                  if (rect.height != 0 && rect.width != 0)
+                    object.aTags.push(JSON.stringify(rect));
+                });
+                object.doc.push(document);
+                return object;
+              }, function(object) {
+                afterEval(object);
+              });
+            } else {
+              page.evaluate(function() {
+                return document;
+              }, function(object) {
+                afterEval(object);
+              });
+            }
+            var afterEval = function(object) {
+              if (linkAnalysis) {
+                var doc = object.doc.pop(); // Document object
+                e.title = doc.title;
+              } else {
+                e.title = object.title;
+              }
+              if (desktopSS) {
+                var path = 'screenshots/' + host;
+                setTimeout(function() {
+                  page.render('./' + path, {
+                    format: 'jpeg',
+                    quality: '60'
+                  }, function() {
+                    if (linkAnalysis)
+                      fs.writeFile('./' + host, JSON.stringify(object), analyzer.afterWrite(path, host, contrast, linkDensity));
+                  });
+                }, renderDelay);
+                e.capture.desktop = path;
+              }
+              e.js = extjsarr;
+              process.done.js = true;
+              emitter.emit('done', process.done);
+              //console.log(e);
+              setTimeout(function() {
+                page.close();
+                ph.exit();
+              }, renderDelay + 1);
+            }
+          });
         });
       });
     });
-  });
-}
+  }
 
-//find all the urls from wwwranking
-//also calls addurl
-function findUrl() {
-  var url1 = "http://wwwranking.webdatacommons.org/Q/?pageIndex=";
-  var url2 = "&pageSize=";
-  j = 0;
-  var timer = setInterval(function() {
-    url3 = url1 + j + url2 + pageSize; //complete url
-    console.log('url3 = ' + url3);
-    download(url3, function(data) {
-      if (data) {
-        var json = JSON.parse(data);
-        for (i = 0; i < pageSize; i++) {
-          html = (json['data'][i]['harmonic']);
-          $ = cheerio.load(html);
-          link = $('a').attr('href');
-          addUrls(link);
-        }
-      } else console.log("error");
-      j++;
+  //find all the urls from wwwranking
+  //also calls addurl
+  function findUrl() {
+    var url1 = "http://wwwranking.webdatacommons.org/Q/?pageIndex=";
+    var url2 = "&pageSize=";
+
+    j = 0;
+    var timer = setInterval(function() {
+      url3 = url1 + j + url2 + pageSize; //complete url
+      console.log('url3 = ' + url3);
+      download(url3, function(data) {
+        if (data) {
+          var json = JSON.parse(data);
+          for (i = 0; i < pageSize; i++) {
+            html = (json['data'][i]['harmonic']);
+            $ = cheerio.load(html);
+            link = $('a').attr('href');
+            addUrls(link);
+          }
+        } else console.log("error");
+        j++;
+      });
+
+      if (j == (pageNo - 1)) { //
+        clearInterval(timer);
+        console.log('Fetching URLs is over.');
+      }
+
+    }, 10000)
+  }
+
+  // Utility function that downloads a URL and invokes
+  // callback with the data.
+  function download(url, callback) {
+    http.get(url, function(res) {
+      var data = "";
+      res.on('data', function(chunk) {
+        data += chunk;
+      });
+      res.on("end", function() {
+        callback(data);
+      });
+    }).on("error", function() {
+      callback(null);
     });
-    if (j == (pageNo - 1)) { //
-      clearInterval(timer);
-      console.log('Fetching URLs is over.');
-    }
-  }, 10000)
-}
+  }
 
-// Utility function that downloads a URL and invokes
-// callback with the data.
-function download(url, callback) {
-  http.get(url, function(res) {
-    var data = "";
-    res.on('data', function(chunk) {
-      data += chunk;
-    });
-    res.on("end", function() {
-      callback(data);
-    });
-  }).on("error", function() {
-    callback(null);
-  });
-}
-
-// Print existing data
-function printData(urls) {
-  urls.find(function(err, urls) {
-    if (err) return console.error(err);
-    console.log(urls)
-  })
-}
-
-// Refactor urls
-function addUrls(url) {
-  if (!addwCheck) { //do without check in db
-    var page = new Data({
-      url: url
-    })
-    page.save(function(err) {
+  // Print existing data
+  function printData(urls) {
+    urls.find(function(err, urls) {
       if (err) return console.error(err);
-      //saved
-      console.log(url + ' saved');
-    })
-  } else { //do with check if already present
-    Data.find({
-      url: url
-    }, function(err, arr) {
-      console.log('searching ' + url);
-      if (err) {
-        console.log(err);
-      }
-      if (arr.length == 0) {
-        var page = new Data({
-          url: url
-        })
-        page.save(function(err) {
-          if (err) return console.error(err);
-        })
-        console.log(url + ' added to ' + colName);
-      } else {
-        console.log(url + ' is already present.');
-      }
+      console.log(urls)
     })
   }
-}
+
+  // Refactor urls
+  function addUrls(url) {
+    if (!addwCheck) { //do without check in db
+      var page = new Data({
+        url: url
+      })
+      page.save(function(err) {
+        if (err) return console.error(err);
+        //saved
+        console.log(url + ' saved');
+      })
+    } else { //do with check if already present
+      Data.find({
+        url: url
+      }, function(err, arr) {
+        console.log('searching ' + url);
+        if (err) {
+          console.log(err);
+        }
+        if (arr.length == 0) {
+          var page = new Data({
+            url: url
+          })
+          page.save(function(err) {
+            if (err) return console.error(err);
+          })
+          console.log(url + ' added to ' + colName);
+        } else {
+          console.log(url + ' is already present.');
+        }
+      })
+    }
+  }

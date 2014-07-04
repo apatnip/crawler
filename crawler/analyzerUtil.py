@@ -7,23 +7,19 @@ from pprint import pprint
 from matplotlib import pyplot as plt
 from sklearn.cluster import KMeans
 
-print 'opened'
-
 font = cv2.FONT_HERSHEY_SIMPLEX
 boxSize = 100
 moveSize = 20
 cordinates = sys.argv[1];
 image = sys.argv[2];
-print cordinates, image
+contrastRatio = sys.argv[3] == "true"
+linkDensity = sys.argv[4] == "true"
+print contrastRatio,linkDensity
 img = cv2.imread(image)
 heightPage, widthPage  = img.shape[:2]
 imageQuality = 56
 
 overlay = img.copy()
-
-cv2.imshow('image',img)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
 
 def relativeLum(color):
 	sRed = float(color[0]/255)
@@ -61,14 +57,15 @@ def contrastCal ():
 			contrast = rL_back/rL_text
 			contrast = [contrast , 1/contrast][contrast < 1]
 			text = str(round(contrast,1))
-			cv2.putText(mask, text, (x+width/4,y+height/4),font, fontScale,(0,0,0),thickness, 8)
+			cv2.putText(mask, text, (x+width/4,y+height/4),font, fontScale,(0,0,0),thickness, cv2.CV_AA)
 			cv2.addWeighted(mask, 0.8, imagE, 1 - 0.8, 0, imagE)
 
 	# Save image
 	saveImage = image+'-contrast.jpg'
 	cv2.imwrite(saveImage,imagE,[int(cv2.IMWRITE_JPEG_QUALITY),imageQuality])
-	cv2.imshow('Contrast',imagE)
-	cv2.waitKey(0)
+	# cv2.imshow('image',imagE)
+	# cv2.waitKey(0)
+	# cv2.destroyAllWindows()
 
 # Checks if a link is inside a box
 def containsLink (x,y,link):
@@ -138,15 +135,24 @@ def getLinkDensity():
 				break
 			x += moveSize
 		y += moveSize
+	blur = cv2.blur(img,(moveSize/2,moveSize/2))
+	opacity = 0.8
+	cv2.addWeighted(overlay, opacity, blur, 1 - opacity, 0, img)
+	# Save image
+	saveImage = image+'-analyzed.jpg'
+	cv2.imwrite(saveImage,img,[int(cv2.IMWRITE_JPEG_QUALITY),imageQuality])
+	# cv2.imshow('image',img)
+	# cv2.waitKey(0)
+	# cv2.destroyAllWindows()
 
 # Read coordinates from file
 with open(cordinates) as data_file:    
     data = json.load(data_file)
 
 # Remove coordinates file
-# os.remove(cordinates)
-
-contrastCal()
+#os.remove(cordinates)
+if(contrastRatio):
+	contrastCal()
 
 # Plot links in image and find margins
 left = widthPage
@@ -164,23 +170,9 @@ for link in data['aTags']:
 	cv2.rectangle(img,(xLink,yLink),(xLink+width,yLink+height),(50,50,50),2)
 
 # Draw margins
-cv2.line(img,(left,0),(left,heightPage),(255,0,0),5)
-cv2.line(img,(right,0),(right,heightPage),(255,0,0),5)
+#cv2.line(img,(left,0),(left,heightPage),(255,0,0),5)
+#cv2.line(img,(right,0),(right,heightPage),(255,0,0),5)
 
 # Find number of links in boxes
-getLinkDensity()
-
-blur = cv2.blur(img,(moveSize/2,moveSize/2))
-
-opacity = 0.8
-cv2.addWeighted(overlay, opacity, blur, 1 - opacity, 0, img)
-
-# Save image
-saveImage = image+'-analyzed.jpg'
-cv2.imwrite(saveImage,img,[int(cv2.IMWRITE_JPEG_QUALITY),imageQuality])
-
-# Show image
-cv2.imshow('image',img)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
-print 'done'
+if(linkDensity):
+	getLinkDensity()

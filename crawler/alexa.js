@@ -29,14 +29,13 @@ exports.append = function(process) {
             })
           }
           process.done.alexa = true;
-          console.log(process.done.alexa);
-          console.log(process);
           emitter.emit('done', process.done);
         });
       } else console.log('Error fetching alexa data for ' + link);
     });
   } else {
+    process.done.alexa = true;
     console.log('Alexa Data already present for ' + link);
-    emitter.emit('done');
+    emitter.emit('done', process.done);
   }
 }
