@@ -28,17 +28,19 @@
 	},
 	"debug": {
 		"do": false,
-		"printPool": false
+		"printPool": false,
+		"printResultDocument": true
 	},
 	"analyse": {
+		"js": true,
 		"screenshot": {
-			"desktop": false,
-			"mobile": false,
+			"desktop": true,
+			"mobile": true,
 			"delay": 1000
 		},
 		"links": {
-			"density": false,
-			"contrast": false
+			"density": true,
+			"contrast": true
 		},
 		"resolution": {
 			"desktop": {
@@ -50,7 +52,6 @@
 			    "height": 480
 			}
 		},
-		"js": false,
 		"resourceTimeOut": 60000
 	},
 	"noOfURLsToFetch": 10,

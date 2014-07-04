@@ -60,7 +60,8 @@ var concurrentProcessing = 2; // Number of processes running at a time
 var live = true;
 var configs, Data;
 
-var debug,printPool;
+var debug,printPool, printResultDocument;
+var linkDensity,contrast;
 
 exports.init = function(file, isLive) {
   // Get config file
@@ -82,11 +83,17 @@ exports.init = function(file, isLive) {
   jsMode = configs.analyse.js;
   // Page speed Insights
   insights = configs.modes.pageSpeedInsights
-  psidMode  = insights.desktop;
+  psidMode = insights.desktop;
   psimMode = insights.mobile;
+
   // Screenshot
   desktopSS = configs.analyse.screenshot.desktop;
   mobileSS = configs.analyse.screenshot.mobile;
+
+  // Image Analysis
+  linkDensity = configs.analyse.links.density;
+  contrast = configs.analyse.links.contrast;
+
   // Resolution
   resolution = configs.analyse.resolution;
   desktopScreen = resolution.desktop;
@@ -109,6 +116,7 @@ exports.init = function(file, isLive) {
 
   debug = configs.debug.do;
   printPool = configs.debug.printPool;
+  printResultDocument = configs.debug.printResultDocument;
 }
 
 pool.push = function(request) {
@@ -144,11 +152,11 @@ processing.push = function(process) {
 function printpool() {
   console.log('Pool contains: ');
   for (i = 0; i < pool.length; i++) {
-    console.log('( %d ) %s', i+1, pool[i].obj.url);
+    console.log('( %d ) %s', i + 1, pool[i].obj.url);
   }
   console.log('Now processing: ');
   for (i = 0; i < processing.length; i++) {
-    console.log('( %d ) %s', i+1, processing[i].obj.url);
+    console.log('( %d ) %s', i + 1, processing[i].obj.url);
   }
 }
 
@@ -172,6 +180,7 @@ exports.liveServer = function(url, res) {
   });
   request.emitter.on('done', function() {
     if(checkdone(request.done)) {
+      if(printResultDocument && debug) console.log(request.obj); 
       processing.splice(processing.indexOf(request), 1);
       if (pool.length > 0) processing.push((pool.splice(0, 1))[0]);
       else if(printPool && debug) printpool();
@@ -238,11 +247,10 @@ function executeThrottled() {
                 con.close();
               } 
             })
+            if(printResultDocument && debug) console.log(request.obj); 
             processing.splice(processing.indexOf(request), 1);
             if (pool.length > 0) processing.push((pool.splice(0, 1))[0]);
             else if(printPool && debug) printpool();
-            console.log(donecount)
-
           }
         });
       }
@@ -362,7 +370,7 @@ function findRes(process) {
                 quality: '60'
               }, function() {
                 if (linkAnalysis) {
-                  fs.writeFile('./' + host + '-m', JSON.stringify(object), analyzer.afterWrite(e, host + '-m'));
+                    fs.writeFile('./' + host + '-m', JSON.stringify(object), analyzer.afterWrite(path, host + '-m', contrast, linkDensity));
                 }
               });
             }, renderDelay);
@@ -505,7 +513,7 @@ function findRes(process) {
                   quality: '60'
                 }, function() {
                   if (linkAnalysis)
-                    fs.writeFile('./' + host, JSON.stringify(object), analyzer.afterWrite(e, host));
+                      fs.writeFile('./' + host, JSON.stringify(object), analyzer.afterWrite(path, host, contrast, linkDensity));
                 });
               }, renderDelay);
               e.capture.desktop = path;
@@ -513,7 +521,6 @@ function findRes(process) {
             e.js = extjsarr;
             process.done.js = true;
             process.emitter.emit('done');
-            console.log(e);
             setTimeout(function() {
               page.close();
               ph.exit();
