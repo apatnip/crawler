@@ -9,10 +9,11 @@ var mongoose = require('mongoose');
 var dbURI = 'mongodb://localhost/crawler';
 //'mongodb://username:password@host:port/database?options...'
 
-exports.init = function(server, port, isLive) {
+exports.init = function(server, port, isLive, colName) {
   dbURI = 'mongodb://' + server + ':' + port + '/crawler';
   if (!isLive)
     mongoose.connect(dbURI);
+  data.init(colName);
 }
 
 // Create the database connection
@@ -40,6 +41,5 @@ process.on('SIGINT', function() {
     process.exit(0);
   });
 });
-
 // BRING IN THE SCHEMAS & MODELS
-require('./data');
+var data = require('./data');

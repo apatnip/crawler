@@ -7,16 +7,23 @@ from pprint import pprint
 from matplotlib import pyplot as plt
 from sklearn.cluster import KMeans
 
+print 'opened'
+
 font = cv2.FONT_HERSHEY_SIMPLEX
 boxSize = 100
 moveSize = 20
 cordinates = sys.argv[1];
 image = sys.argv[2];
+print cordinates, image
 img = cv2.imread(image)
 heightPage, widthPage  = img.shape[:2]
 imageQuality = 56
 
 overlay = img.copy()
+
+cv2.imshow('image',img)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
 
 def relativeLum(color):
 	sRed = float(color[0]/255)
@@ -60,6 +67,8 @@ def contrastCal ():
 	# Save image
 	saveImage = image+'-contrast.jpg'
 	cv2.imwrite(saveImage,imagE,[int(cv2.IMWRITE_JPEG_QUALITY),imageQuality])
+	cv2.imshow('Contrast',imagE)
+	cv2.waitKey(0)
 
 # Checks if a link is inside a box
 def containsLink (x,y,link):
@@ -169,3 +178,9 @@ cv2.addWeighted(overlay, opacity, blur, 1 - opacity, 0, img)
 # Save image
 saveImage = image+'-analyzed.jpg'
 cv2.imwrite(saveImage,img,[int(cv2.IMWRITE_JPEG_QUALITY),imageQuality])
+
+# Show image
+cv2.imshow('image',img)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
+print 'done'

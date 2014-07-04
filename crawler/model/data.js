@@ -1,5 +1,8 @@
-//GET parameter
 var colName = 'thoupages';
+
+exports.init = function(colName) {
+	var Data = module.exports = mongoose.model(colName, dataSchema);
+}
 
 var mongoose = require( 'mongoose' );
 
@@ -23,4 +26,3 @@ var dataSchema = new mongoose.Schema({
 	html: String,
 	alexa: mongoose.Schema.Types.Mixed
 });
-var Data = module.exports = mongoose.model(colName, dataSchema);

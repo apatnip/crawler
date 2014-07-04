@@ -1,0 +1,59 @@
+{
+	"printDB": false,
+	"RESTServerport": 8888,
+	"newUrls": {
+		"get": false,
+		"checkIfAlreadyExists": true,
+		"slotSize": 1000,
+		"noOfSlots": 10
+	},
+	"db": {
+		"server": "192.168.100.73",
+		"port": 27017,
+		"collection": "newpages"
+	},
+	"queryToDB": "",
+	"modes": {
+		"alexa": false,
+		"analyse": true,
+		"pageSpeedInsights": {
+			"desktop": false,
+			"mobile": false
+		}
+	},
+	"google": {
+		"APIkey": "AIzaSyDP18DJHojJMOyVdjjtcZDVfxVDCHfXpj4"
+	},
+	"analyse": {
+		"screenshot": {
+			"desktop": false,
+			"mobile": false,
+			"delay": 1000
+		},
+		"links": {
+			"density": false,
+			"contrast": false
+		},
+		"resolution": {
+			"desktop": {
+			    "width": 1366,
+			    "height": 768
+			 },
+			"mobile": {
+			    "width": 320,
+			    "height": 480
+			}
+		},
+		"js": true,
+		"resourceTimeOut": 60000
+	},
+	"noOfURLsToFetch": 50,
+  	"slotsOfFetching": 2,
+  	"imageAnalysis": true,
+	"bgWhite": true,
+	"resourceTimeOut": 60000,
+	"slots_NoOfUrlsToFetch": 100,
+	"noOfSlots": 10,
+	"executeInterval": 5000,
+	"noOfConcurrentProcess": 5
+}
