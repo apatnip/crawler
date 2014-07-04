@@ -60,13 +60,15 @@ var concurrentProcessing = 2; // Number of processes running at a time
 var live = true;
 var configs, Data;
 
+var debug,printPool;
+
 exports.init = function(file, isLive) {
   // Get config file
   configs = require(file);
   live = isLive == true;
   // Call init for other files
   psi.init(configs, live);
-  alexa.init(live);
+  alexa.init(live, configs.alexa.withCheck);
   // Set parameter values
   key = configs.google.APIkey;
   // New URLs
@@ -76,7 +78,7 @@ exports.init = function(file, isLive) {
   pageSize = newUrls.slotSize;
   pageNo = newUrls.noOfSlots;
   // Modes
-  alexaMode = configs.modes.alexa;
+  alexaMode = configs.alexa.get;
   jsMode = configs.analyse.js;
   // Page speed Insights
   insights = configs.modes.pageSpeedInsights
@@ -104,6 +106,9 @@ exports.init = function(file, isLive) {
   linkAnalysis = configs.imageAnalysis;
   renderDelay = configs.analyse.screenshot.delay;
   Data = mongoose.model(colName);
+
+  debug = configs.debug.do;
+  printPool = configs.debug.printPool;
 }
 
 pool.push = function(request) {
@@ -128,7 +133,7 @@ processing.push = function(process) {
   e = process.obj;
   console.log('%s is now processing'.yellow, e.url);
   x = Array.prototype.push.apply(this, arguments);
-  printpool();
+  if (printPool && debug) printpool();
   if (jsMode) findRes(process);
   if (psidMode) psi.append(process, 'desktop');
   if (psimMode) psi.append(process, 'mobile');
@@ -169,7 +174,7 @@ exports.liveServer = function(url, res) {
     if(checkdone(request.done)) {
       processing.splice(processing.indexOf(request), 1);
       if (pool.length > 0) processing.push((pool.splice(0, 1))[0]);
-      else printpool();
+      else if(printPool && debug) printpool();
       res.end(JSON.stringify(request.obj, null, 2) + '\n');
       /*
       path = './'+e.capture;
@@ -185,13 +190,16 @@ exports.liveServer = function(url, res) {
 };
 
 function checkdone(done) {
-  console.log(done);
-  if (done.alexa == alexaMode && done.js == jsMode && done.psid == psidMode && done.psim == psimMode) return true;
+  //console.log(done);
+  if (done.alexa == alexaMode && done.js == jsMode && done.psid == psidMode && done.psim == psimMode) {
+    return true;
+  }
   else return false;
 }
 // Automated Version
+var con;
 exports.automate = function() {
-  var con = mongoose.connection;
+  con = mongoose.connection;
   con.on('error', console.error.bind(console, 'connection error:'));
   con.once('open', function callback() {
 
@@ -217,50 +225,30 @@ function executeThrottled() {
         var emitter = new events.EventEmitter();
         request.emitter = emitter;
         pool.push(request);
-        request.emitter.on('done', function(done) {
-          console.log('received done: '+done);
-          console.log(request);
+        request.emitter.on('done', function() {
+        //  console.log('received done: '+done);
+          //console.log(request);
           if(checkdone(request.done)) {
-            e.save(function(err) {
+            element.save(function(err) {
               if (err) return console.error(err);
-              console.log(e);
+              //console.log(element);
               donecount++;
               console.info('Done '.green + donecount);
+              if(donecount == noofpages){
+                con.close();
+              } 
             })
             processing.splice(processing.indexOf(request), 1);
             if (pool.length > 0) processing.push((pool.splice(0, 1))[0]);
-            else printpool();
+            else if(printPool && debug) printpool();
+            console.log(donecount)
+
           }
         });
       }
     })
   });
 }
-/*
-function execute() {
-  Data.find(query, function(err, arr) {
-    var add = 0;
-    if (noofpages == 0) noofpages = arr.length;
-    console.log('total = ' + noofpages);
-    timera = setInterval(function() {
-      for (i = add; i < slots + add; i++) {
-        if (i == noofpages) {
-          console.log('timer stopped');
-          clearInterval(timera);
-          break;
-        }
-        e = arr[i];
-        console.log('( %d ) ' + e.url.bold, i + 1);
-        if (jsMode) findRes(e);
-        if (psidMode) psi.append(e, 'desktop');
-        if (psimMode) psi.append(e, 'mobile');
-        if (alexaMode) alexa.append(e);
-      }
-      add += slots;
-    }, executeInterval);
-  });
-}
-*/
 String.prototype.endsWith = function(suffix) {
   return this.indexOf(suffix, this.length - suffix.length) !== -1;
 };
@@ -298,13 +286,12 @@ function testimg(url, type) {
 }
 
 function findRes(process) {
+  var e = process.obj;
   var pageurl = e.url;
-  e = process.obj;
-  emitter = process.emitter;
   // Crash Object
   var crash = phantom.crash(pageurl);
   crash.once('error', function() {
-    e.crash = true;
+    e.crash = true; 
     console.error('Crashed: '.yellow + crash.url);
     console.error(pageurl + ' sucks :-P It crashed!!\n');
     if (!live) {
@@ -525,7 +512,7 @@ function findRes(process) {
             }
             e.js = extjsarr;
             process.done.js = true;
-            emitter.emit('done');
+            process.emitter.emit('done');
             console.log(e);
             setTimeout(function() {
               page.close();

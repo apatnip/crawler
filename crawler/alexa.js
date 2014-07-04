@@ -1,18 +1,18 @@
 var request = require('request');
 var parseString = require('xml2js').parseString;
 var live;
-
-exports.init = function(configs, isLive) {
+var withCheck = true;
+exports.init = function(isLive, withcheck) {
   live = isLive == true;
+  withCheck = withcheck
 }
 
 if (!live) var adone = 0;
 
 exports.append = function(process) {
-  e = process.obj;
-  emitter = process.emitter;
-  link = e.url;
-  if (e.alexa == null) {
+  var e = process.obj;
+  var link = e.url;
+  if(!(withCheck && e.alexa!=null)) {
     console.log('Fetching alexa data for -> ' + e.url);
     var aurl = 'http://data.alexa.com/data?cli=10&dat=snbamz&url=' + link;
     var rank;
@@ -29,14 +29,13 @@ exports.append = function(process) {
             })
           }
           process.done.alexa = true;
-          console.log(process.done.alexa);
-          console.log(process);
-          emitter.emit('done', process.done);
+          process.emitter.emit('done');
         });
       } else console.log('Error fetching alexa data for ' + link);
     });
   } else {
     console.log('Alexa Data already present for ' + link);
-    emitter.emit('done');
+    process.done.alexa = true;
+    process.emitter.emit('done');
   }
 }

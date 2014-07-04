@@ -10,12 +10,10 @@
 	"db": {
 		"server": "192.168.100.73",
 		"port": 27017,
-		"collection": "newpages"
+		"collection": "thoupages"
 	},
 	"queryToDB": "",
 	"modes": {
-		"alexa": false,
-		"analyse": true,
 		"pageSpeedInsights": {
 			"desktop": false,
 			"mobile": false
@@ -23,6 +21,14 @@
 	},
 	"google": {
 		"APIkey": "AIzaSyDP18DJHojJMOyVdjjtcZDVfxVDCHfXpj4"
+	},
+	"alexa": {
+		"get": true,
+		"withCheck": false
+	},
+	"debug": {
+		"do": false,
+		"printPool": false
 	},
 	"analyse": {
 		"screenshot": {
@@ -44,10 +50,10 @@
 			    "height": 480
 			}
 		},
-		"js": true,
+		"js": false,
 		"resourceTimeOut": 60000
 	},
-	"noOfURLsToFetch": 50,
+	"noOfURLsToFetch": 10,
   	"slotsOfFetching": 2,
   	"imageAnalysis": true,
 	"bgWhite": true,
