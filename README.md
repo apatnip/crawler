@@ -5,9 +5,7 @@ Project Crawler
 ### Setup ###
 
 * Clone the Repository
-* Run in terminal 
-```npm install
-```
+* Run in terminal `npm install`
 * Copy phantom.js from crawler to crawler/node_modules/phantom/.
 
 ### Configuration ###
